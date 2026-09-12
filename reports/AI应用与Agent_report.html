@@ -1,0 +1,1836 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
+<!-- industry-research 编辑风报告模板 · 共享底座 V2.7.2（industry/manifesto/author/techdive 共用） · 渲染由 scripts/render_report_html.py 注入
+     V2.7.2（skill V2.20.2·2026-06-14）：3 渲染器抗 LLM schema 漂移（治本"data 在却空白/undefined"）——renderGeo 兼容 players[]｜value+note 双模式（无 players 走份额模式·根除 0 面积空白）；renderTrend spark 兼容 points｜series + xrange｜periods + latest 缺则取 series 末值（根除"→需补"假阴）；buildValueflow sources detail|def|note|text · pools n|name + text|detail · mainflow players[]||text · parallel detail||text（根除 undefined）。**+ `.vf-pool .pn` CSS 修复**：旧 `width:18px`（为数字徽章设计）遇 `n` 装整段中文标签时强制每字一行→垂直堆叠→box 巨高且大片空白；改 `min-width:18px;white-space:nowrap;font-size:15px`，徽章与长标签两用、单行不竖排（AI支付 实证：池 box 从 ~600px 垂直 → 48px 单行）。AI支付报告 headless 实证：geo canvas 47KB PNG 真绘 + trend 2 真 sparkline + valueflow 0 undefined + pool box 48px 单行。
+     V2.7.2b（同批·geo 标的入图）：renderGeo 玩家模式升级——有 `co.value`(份额) 时按份额定国块大小、玩家均分该国块（块∝份额 ∧ 每个玩家=具名子块），无 value 退回块=玩家数；这样国别图同时给"份额"与"具体标的"（AI支付 实证：美国块最大含 Visa/MA/Circle/Coinbase… 22 标的全入图）。geo 数据应给 `players[]`(本国标的) + 可选 `value`(份额) + `note`(战略一句话·tooltip)。
+     V2.7.3（techdive 真图标注模式）：renderAnatomy 加 image-mode——有 `anatomy.image.url`（websearch 真实权威配图：厂商/数据手册/论文图）时，用真图 `<img>` + 编号 callout 覆盖层(`callouts[].n/x/y`·x/y 0-100%) + 图源出处行 替代合成 SVG，与图例表 # 一一对应；治"合成解剖图画不像真物"（GB200 托盘/具体封装等）。CSS = .anat-img/.anat-co/.anat-imgsrc。零回归（无 image 走原合成分支）。audit 自动豁免合成形状反退化、改查 image.source 出处归属。
+     V2.7.0：纯加法新增 renderAnatomy = 实体标注解剖图（SVG schematic 编号 callout + 图例表，供 /techdive），不动任何现有渲染器
+     V2.7.1：renderAnatomy 升级为通用标注解剖图——data 驱动 + 可扩展原型库（BOARD_SHELL 外壳 ×5：pcb/stack/module/mech/die；
+             PART_GLYPH 部件图元 ×12：chip/die/connector/heatsink/capacitor/coil/gear/cell/lens/port/stack-layer/rect）
+             + path 逃生舱（board.path / parts[].path 给任意轮廓）+ board.view:"section" 剖面视图 + 外置 leader-line 标注。
+             三重缺省回退保证老 anatomy JSON 字节级不变；其余 14 个渲染器一字未动。
+     V2.7.1a：renderAnatomy 富分支加坐标制式自动识别（非剖面下任一坐标>100=绝对板内 px，否则百分比 0-100；剖面恒按比例堆叠）——
+              作者用绝对或百分比两种写法都渲染正确，few-shot 绝对坐标无需改写；百分比 JSON 行为不变（零回归）。 -->
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI 应用与 Agent · 产业研究 · 编辑版</title>
+<script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+:root{
+ --paper:#faf8f3; --paper2:#f3efe5; --ink:#1c1a17; --ink2:#3a352d;
+ --muted:#6b655c; --faint:#a89e8c; --line:#e0d9cb; --line2:#cbbfa6;
+ --ox:#8c2f23; --ox2:#a8483a; --gold:#9a7b1f; --goldbar:#c9a227;
+ --serif:"Songti SC","Source Han Serif SC","Noto Serif SC","SimSun",Georgia,serif;
+ --sans:"PingFang SC","Microsoft YaHei","Segoe UI",-apple-system,sans-serif;
+}
+*{box-sizing:border-box} html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink2);font-family:var(--sans);font-size:16px;line-height:1.85;-webkit-font-smoothing:antialiased}
+.page{max-width:768px;margin:0 auto;padding:0 26px 120px}
+/* masthead */
+.masthead{padding:60px 0 30px;border-bottom:3px double var(--line2);margin-bottom:8px}
+.masthead .kick{letter-spacing:.3em;font-size:11px;color:var(--ox);text-transform:uppercase;margin-bottom:18px}
+.masthead h1{font-family:var(--serif);font-weight:700;font-size:52px;line-height:1.04;letter-spacing:-1px;color:var(--ink);margin:0 0 14px;max-width:9em}
+.masthead .standfirst{font-family:var(--serif);font-size:19px;line-height:1.6;color:var(--ink2);max-width:30em;margin:0 0 22px}
+.masthead .meta{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:14px}
+.masthead .meta b{color:var(--ink);font-weight:600}
+/* dashboard — stacked full width */
+.dash{margin:34px 0 10px}
+.dash .dh{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+.figrow{margin:30px 0;padding-top:22px;border-top:1px solid var(--line)}
+.figrow:first-of-type{border-top:none}
+.figrow h4{font-family:var(--serif);font-size:18px;color:var(--ink);margin:0 0 2px;font-weight:700}
+.figrow .cap{font-size:12.5px;color:var(--muted);margin:0 0 12px}
+.chart{width:100%}
+@media(max-width:640px){.masthead h1{font-size:38px}}
+/* body typography */
+#content h1{font-family:var(--serif);font-weight:700;font-size:33px;line-height:1.15;color:var(--ink);margin:64px 0 6px;padding-top:26px;border-top:1px solid var(--line2);letter-spacing:-.5px}
+#content h1:first-child{border-top:none;padding-top:0;margin-top:30px}
+#content h2{font-family:var(--serif);font-weight:700;font-size:23px;color:var(--ink);margin:42px 0 10px}
+#content h3{font-weight:700;font-size:16px;color:var(--ox);letter-spacing:.02em;margin:30px 0 8px}
+#content h4{font-weight:700;font-size:14.5px;color:var(--ink2);margin:22px 0 6px}
+#content p{margin:0 0 16px;text-align:justify}
+#content a{color:var(--ox);text-decoration:none;border-bottom:1px solid var(--line2)}
+#content strong{color:var(--ink);font-weight:700}
+#content em{color:var(--ox2);font-style:normal;background:linear-gradient(transparent 60%,#f0e6cf 60%)}
+#content ul,#content ol{margin:0 0 18px;padding-left:1.3em}
+#content li{margin:0 0 7px}
+#content ul li::marker{color:var(--ox)}
+#content blockquote{margin:22px 0;padding:4px 0 4px 22px;border-left:3px solid var(--gold);font-family:var(--serif);font-size:18px;line-height:1.6;color:var(--ink);font-style:italic}
+#content hr{border:none;border-top:1px solid var(--line);margin:34px 0}
+#content code{font-family:"SF Mono",Menlo,monospace;font-size:.82em;background:var(--paper2);padding:1px 5px;border-radius:3px;color:var(--ox)}
+#content pre{background:#221f1a;color:#e6ddc9;border-radius:6px;padding:18px 20px;overflow-x:auto;font-size:12px;line-height:1.55;margin:20px 0;box-shadow:inset 0 0 0 1px #000}
+#content pre code{background:none;color:inherit;padding:0;font-size:12px}
+/* tables — editorial + 防竖排 + 横向滚动 */
+.tablewrap{overflow-x:auto;margin:22px 0;-webkit-overflow-scrolling:touch}
+#content table{width:100%;border-collapse:collapse;margin:0;font-size:13px;line-height:1.5;table-layout:auto}
+#content th,#content td{word-break:keep-all;overflow-wrap:break-word}
+#content thead th{font-weight:700;color:var(--ink);text-align:left;border-bottom:2px solid var(--ink);padding:8px 10px;background:var(--paper2);white-space:nowrap}
+#content tbody td{padding:7px 10px;border-bottom:1px solid var(--line);color:var(--ink2);vertical-align:top}
+#content tbody td:first-child,#content thead th:first-child{white-space:nowrap;font-weight:600;color:var(--ink)}
+#content tbody tr:hover{background:#f5f1e7}
+/* ticker → Yahoo 链接 */
+a.tk-link{color:var(--ox);border-bottom:1px dotted var(--ox2);font-family:"SF Mono",Menlo,monospace;font-size:.94em;white-space:nowrap}
+a.tk-link::after{content:"↗";font-size:.7em;vertical-align:super;opacity:.6;margin-left:1px}
+/* inline rendered figure */
+.vizfig{margin:24px 0 30px}
+.vizfig figcaption{font-family:var(--serif);font-size:13px;color:var(--muted);font-style:italic;margin:0 0 3px;padding-left:12px;border-left:3px solid var(--gold)}
+/* V2.6 卖方级图表描述：结论式副标题 + 数据源脚注（全图共用 figHead/figFoot）*/
+.vfig-sub{font-family:var(--serif);font-size:15.5px;line-height:1.5;color:var(--ink);font-weight:700;margin:0 0 12px;padding-left:12px}
+.vfig-foot{margin-top:11px;padding-top:7px;border-top:1px dotted var(--line2);font-size:10.5px;color:var(--faint);display:flex;flex-wrap:wrap;gap:3px 18px}
+.vfig-foot .vfig-hint{font-style:italic}
+.vfig-foot .vfig-src{margin-left:auto}
+.vchart{width:100%}
+.mermaid{text-align:center;margin:22px 0}
+/* editorial chain diagram */
+.chain-fig{margin:4px 0 8px}
+.clayer{display:grid;grid-template-columns:74px 1fr;gap:0 20px;padding:20px 0;border-top:1px solid var(--line)}
+.clayer:last-child{border-bottom:1px solid var(--line)}
+.clayer .num{font-family:var(--serif);font-size:50px;line-height:.82;color:var(--line2);font-weight:700}
+.clayer.bn .num{color:var(--ox)} .clayer.hi .num{color:var(--gold)}
+.clayer .lname{font-size:17px;font-weight:700;color:var(--ink)}
+.clayer .lname .stars{color:var(--goldbar);font-size:12px;letter-spacing:1px;margin-left:9px}
+.clayer .ldef{color:var(--muted);font-size:12.5px;margin:3px 0 11px;line-height:1.6}
+.clayer .plist{font-size:14px;line-height:2.05;color:var(--ink2)}
+.clayer .pl .sup{font-size:10px;vertical-align:super;font-weight:700;margin-right:1px}
+.clayer .sep{color:var(--line2);margin:0 8px}
+.clayer .tk{font-size:11px;color:var(--ox);font-weight:600;font-family:"SF Mono",monospace}
+.clayer .pv{font-size:10px;color:var(--faint);border:1px solid var(--line2);border-radius:3px;padding:0 3px;margin-left:2px}
+.clayer .sh{color:var(--gold);border-bottom:2px solid var(--goldbar);font-weight:700}
+.clayer .note{display:block;font-size:12px;color:var(--ox);margin-top:6px;font-style:italic;font-family:var(--serif)}
+.chain-legend{display:flex;flex-wrap:wrap;gap:7px 18px;font-size:11.5px;color:var(--muted);margin:8px 0 0;padding-top:12px;border-top:1px dashed var(--line2)}
+.chain-legend .sup{font-size:10px;vertical-align:super;font-weight:700;margin-right:2px}
+.natus{color:#8c2f23}.nateu{color:#1e7e4f}.natcn{color:#b8860b}.natres{color:#8a8a8a}.natgate{color:#6d4c9a}
+/* value-flow 富渲染 */
+.vf{font-family:var(--sans)}
+.vf .vf-h{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);margin:18px 0 8px}
+.vf-src{background:var(--paper2);border-radius:8px;padding:14px 18px}
+.vf-src .s{font-size:13.5px;line-height:1.7;color:var(--ink2)}
+.vf-src .s b{color:var(--ink)}
+.vf-conn{text-align:center;color:var(--line2);font-size:13px;margin:8px 0;letter-spacing:2px}
+.vf-layer{position:relative;border:1px solid var(--line);border-left:4px solid var(--line2);border-radius:8px;padding:13px 16px;margin:10px 0;background:#fff}
+.vf-layer.pool{border-left-color:var(--goldbar);background:linear-gradient(100deg,#fbf6e6,#fff 60%)}
+.vf-layer.tuna{border-left-color:var(--ox)}
+.vf-layer .lh{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.vf-layer .id{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--ox);line-height:1}
+.vf-layer.pool .id{color:var(--gold)}
+.vf-layer .nm{font-size:15.5px;font-weight:700;color:var(--ink)}
+.vf-layer .nat{font-size:11.5px;color:#fff;background:var(--muted);border-radius:10px;padding:1px 8px}
+.vf-layer.pool .nat{background:var(--gold)} .vf-layer.tuna .nat{background:var(--ox)}
+.vf-layer .annot{margin-left:auto;font-size:11.5px;color:var(--ox);font-style:italic;font-family:var(--serif)}
+.vf-layer .pl{font-size:13px;color:var(--ink2);margin-top:7px;line-height:1.7}
+.vf-layer .pl .dot{color:var(--line2);margin:0 6px}
+.vf-layer .key{font-size:12px;color:var(--gold);margin-top:6px;font-weight:600}
+.vf-flownote{font-size:12px;color:var(--muted);font-style:italic;text-align:center;margin:4px 0;font-family:var(--serif)}
+.vf-div{display:flex;align-items:center;gap:12px;margin:22px 0 6px;color:var(--ink);font-weight:700;font-size:14px}
+.vf-div::before,.vf-div::after{content:"";flex:1;height:1px;background:var(--line2)}
+.vf-pools{counter-reset:pool;display:grid;gap:8px;margin-top:6px}
+.vf-pool{display:flex;align-items:baseline;gap:10px;background:#fff;border:1px solid var(--line);border-radius:7px;padding:9px 14px;font-size:13.5px}
+.vf-pool .pn{font-family:var(--serif);font-weight:700;color:var(--gold);font-size:15px;flex:none;min-width:18px;white-space:nowrap}
+.vf-pool .pt{color:var(--ink2)} .vf-pool .pt b{color:var(--ink)}
+.vf-pool .pg{margin-left:auto;color:var(--goldbar);font-size:11px;white-space:nowrap}
+.vf-take{margin-top:16px;padding:14px 18px;background:#241f17;color:#f0e6cf;border-radius:8px;font-size:14px;line-height:1.7}
+.vf-take b{color:#f4c95d}
+/* 生命周期 × 卡脖子定位矩阵（A.2）*/
+.lcm{display:grid;gap:3px;margin:8px 0 4px;font-family:var(--sans);font-size:12.5px}
+.lcm .lc-corner{font-family:var(--serif);font-size:11px;color:var(--muted);padding:8px;display:flex;align-items:center;background:var(--paper2);border-radius:3px}
+.lcm .lc-h{color:#fff;font-weight:700;text-align:center;padding:7px 4px;border-radius:3px;font-size:12px}
+.lcm .lc-row{font-family:var(--serif);font-weight:700;color:var(--ink);padding:8px;display:flex;align-items:center;background:var(--paper2);border-radius:3px}
+.lcm .lc-cell{padding:7px 6px;border-radius:3px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:36px}
+.lcm .lc-chip{background:#fff;border:1px solid var(--line2);border-radius:4px;padding:1px 7px;color:var(--ink2);font-size:12px;white-space:nowrap}
+.lcm .lc-dash{color:var(--faint)}
+/* timeline 时间线（作品/catalyst/事件）*/
+.tl{position:relative;margin:6px 0 4px;padding-left:4px;border-left:2px solid var(--line2)}
+.tl-it{position:relative;padding:0 0 16px 20px}
+.tl-it::before{content:"";position:absolute;left:-7px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--ox);border:2px solid var(--paper)}
+.tl-it.up::before{background:var(--gold)}
+.tl-it .d{font-family:"SF Mono",Menlo,monospace;font-size:11px;color:var(--ox);font-weight:600}
+.tl-it .t{font-weight:700;color:var(--ink);font-size:14px;margin:1px 0}
+.tl-it .x{color:var(--muted);font-size:12.5px;line-height:1.6}
+.tl-it .tag{font-size:10px;color:#fff;background:var(--gold);border-radius:3px;padding:0 6px;margin-left:6px;vertical-align:middle}
+/* scorecard 命中率卡 */
+.scard{margin:6px 0 4px}
+.scard .hr{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}
+.scard .hr .big{font-family:var(--serif);font-size:40px;font-weight:700;color:var(--ox);line-height:1}
+.scard .hr .lb{font-size:13px;color:var(--muted)}
+.scard .row{display:grid;grid-template-columns:22px 84px 1fr;gap:0 10px;padding:8px 0;border-top:1px solid var(--line);align-items:start;font-size:13px}
+.scard .row:last-child{border-bottom:1px solid var(--line)}
+.scard .ic{font-weight:700;text-align:center}
+.scard .ic.hit{color:#1e7e4f}.scard .ic.miss{color:#c0392b}.scard .ic.part{color:var(--gold)}
+.scard .dt{font-family:"SF Mono",Menlo,monospace;font-size:11px;color:var(--faint)}
+.scard .pr b{color:var(--ink)}.scard .pr .nt{color:var(--muted);font-size:12px;display:block;margin-top:2px}
+/* gauge 评分仪表 */
+.gau{margin:6px 0 4px}
+.gau .top{display:flex;align-items:baseline;gap:8px;margin-bottom:12px}
+.gau .top .big{font-family:var(--serif);font-size:40px;font-weight:700;color:var(--gold);line-height:1}
+.gau .top .mx{font-size:14px;color:var(--faint)}
+.gau .top .lb{font-size:13px;color:var(--ink2);margin-left:6px}
+.gau .sub{display:grid;grid-template-columns:130px 1fr 46px;gap:7px 10px;align-items:center;font-size:12.5px;margin-top:6px}
+.gau .sub .nm{color:var(--ink2)}
+.gau .bar{height:8px;background:var(--paper2);border-radius:4px;overflow:hidden}
+.gau .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),var(--goldbar))}
+.gau .sub .vv{color:var(--muted);font-size:11px;text-align:right}
+/* cycle 双轴定位（生命周期 S 曲线 × 周期相位）*/
+.cyc{margin:6px 0 4px}
+.cyc-ax{margin:12px 0 6px}
+.cyc-lbl{font-size:12.5px;color:var(--ink2);margin-bottom:2px}
+.cyc-lbl b{color:var(--ox);font-weight:700}
+.cyc svg{width:100%;height:auto;display:block;overflow:visible}
+.cyc-sig{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:16px}
+@media(max-width:560px){.cyc-sig{grid-template-columns:1fr}}
+.cyc-sig .col h5{margin:0 0 5px;font-size:11.5px;font-weight:700;letter-spacing:.02em}
+.cyc-sig .danger h5{color:#c0392b}.cyc-sig .safe h5{color:#1e7e4f}.cyc-sig .watch h5{color:var(--gold)}
+.cyc-sig ul{margin:0;padding-left:1.05em;line-height:1.5}
+.cyc-sig li{margin:0 0 4px;color:var(--ink2);font-size:12px}
+.cyc-bm{margin-top:14px;padding:10px 14px;background:var(--paper2);border-radius:6px;font-size:12px;color:var(--ink2);line-height:1.6}
+.cyc-bm b{color:var(--ink)}
+.cyc-basis{margin-top:13px;font-size:12px;color:var(--ink2);line-height:1.6}
+.cyc-basis b{color:var(--gold)}
+.cyc-syn{margin-top:13px;padding:11px 15px;background:#241f17;color:#f0e6cf;border-radius:7px;font-size:13px;line-height:1.65;font-weight:600}
+/* trend 强度指标时序小多图（周期证据层）*/
+.tr{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:14px;margin:6px 0 4px}
+.tr-cell{border:1px solid var(--line);border-radius:7px;padding:10px 12px;background:#fff}
+.tr-nm{font-size:12px;font-weight:700;color:var(--ink);margin-bottom:5px;line-height:1.3}
+.tr svg{width:100%;height:auto;display:block}
+.tr-foot{display:flex;align-items:baseline;justify-content:space-between;margin-top:5px}
+.tr-val{font-family:"SF Mono",Menlo,monospace;font-size:14px;font-weight:700;color:var(--ink)}
+.tr-dir{font-size:15px;font-weight:700;line-height:1}
+.tr-note{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.45}
+/* benchbar 当前 vs 历史泡沫阈值对标条 */
+.bb{margin:6px 0 4px}
+.bb-an{font-size:12px;color:var(--muted);margin-bottom:12px}
+.bb-an b{color:var(--ox)}
+.bb-row{display:grid;grid-template-columns:148px 1fr 150px;gap:6px 12px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.bb-row:last-child{border-bottom:1px solid var(--line)}
+.bb-nm{font-size:12.5px;color:var(--ink2);font-weight:600}
+.bb-track{position:relative;height:13px;background:var(--paper2);border-radius:7px}
+.bb-fill{height:100%;border-radius:7px}
+.bb-thr{position:absolute;top:-4px;width:2px;height:21px;background:var(--ink);opacity:.72}
+.bb-anmark{position:absolute;top:50%;width:9px;height:9px;background:var(--ox);transform:translate(-50%,-50%) rotate(45deg);border:1px solid #faf8f3}
+.bb-val{font-size:12px}
+.bb-val b{font-family:"SF Mono",Menlo,monospace}
+.bb-dir{font-size:9.5px;color:var(--faint);font-weight:400;margin-left:6px;white-space:nowrap}
+.bb-refline{display:block;font-size:9.5px;color:var(--faint);margin-top:2px}
+.bb-ref{color:var(--ox)}
+.bb-note{grid-column:1/-1;font-size:11px;color:var(--muted);margin:2px 0 0;padding-left:160px;line-height:1.4}
+@media(max-width:560px){.bb-row{grid-template-columns:1fr}.bb-note{padding-left:0}}
+/* anatomy 实体标注解剖图（编号 callout schematic + 图例表 · /techdive 技术详解）*/
+.anat{margin:6px 0 4px}
+.anat-board{width:100%;height:auto;display:block;background:var(--paper2);border:1px solid var(--line2);border-radius:8px}
+.anat-board .ab-bg{fill:#f6f1e4;stroke:var(--line2);stroke-width:1.5}
+.anat-board .ab-part rect{stroke:var(--paper);stroke-width:1.5;rx:3}
+.anat-board .ab-badge{fill:var(--ink);stroke:var(--paper);stroke-width:1.5}
+.anat-board .ab-bnum{fill:#faf8f3;font-family:var(--serif);font-weight:700;font-size:11px;text-anchor:middle}
+.anat-board .ab-pname{fill:var(--ink2);font-family:var(--sans);font-size:8.5px;text-anchor:middle}
+/* V2.7.1 通用原型外壳 / 部件图元 / 外置 leader-line 标注 */
+.anat-board .ab-shell{fill:#f1ead9;stroke:var(--line2);stroke-width:1.4}
+.anat-board .ab-shell2{fill:#e9e0cb;stroke:var(--line2);stroke-width:1.2}
+.anat-board .ab-edge{fill:none;stroke:var(--line2);stroke-width:1.2}
+.anat-board .ab-edge-d{fill:none;stroke:var(--faint);stroke-width:.8;stroke-dasharray:3 3}
+.anat-board .ab-trace{fill:none;stroke:#c9a227;stroke-width:.8;opacity:.5}
+.anat-board .ab-metal{fill:#d8cdb4;stroke:var(--line2);stroke-width:1.2}
+.anat-board .ab-hole{fill:var(--paper2);stroke:var(--line2);stroke-width:1}
+.anat-board .ab-pin{stroke:#6b655c;stroke-width:1.1;stroke-linecap:round}
+.anat-board .ab-pin1{fill:#8c2f23}
+.anat-board .ab-glyph-ln{fill:none;stroke:var(--paper2);stroke-width:.9;opacity:.65}
+.anat-board .ab-lead{fill:none;stroke:var(--faint);stroke-width:.5;stroke-dasharray:2.5 2.5}
+.anat-board .ab-tsv{fill:none;stroke:#a8483a;stroke-width:1.1;stroke-dasharray:2 2;opacity:.7}
+.anat-board .ab-pname-o{fill:var(--muted);font-family:var(--sans);font-size:8px}
+.anat-leg{width:100%;border-collapse:collapse;margin:14px 0 0;font-size:12.5px;line-height:1.5}
+.anat-leg th{font-weight:700;color:var(--ink);text-align:left;border-bottom:2px solid var(--ink);padding:7px 9px;background:var(--paper2);white-space:nowrap}
+.anat-leg td{padding:7px 9px;border-bottom:1px solid var(--line);color:var(--ink2);vertical-align:top}
+.anat-leg tr:hover td{background:#f5f1e7}
+.anat-leg .lg-n{font-family:var(--serif);font-weight:700;color:var(--ox);text-align:center;white-space:nowrap}
+.anat-leg .lg-nm{font-weight:600;color:var(--ink);white-space:nowrap}
+.anat-leg .lg-nm .gr{color:var(--goldbar);font-size:10px;letter-spacing:.5px;margin-left:5px}
+.anat-leg .lg-co{font-family:"SF Mono",Menlo,monospace;font-size:11px;color:var(--ox);white-space:nowrap}
+.anat-leg .lg-co .sec{color:var(--faint);font-family:var(--sans);font-size:10px;margin-left:4px}
+.anat-leg .lg-dash{color:var(--faint)}
+.anat-note{margin-top:11px;font-size:11.5px;color:var(--muted);line-height:1.6;font-style:italic;font-family:var(--serif)}
+/* ★ V2.7.3 真图标注模式（image-mode anatomy）：真实权威配图 + 编号 callout 覆盖层 + 出处归属 */
+.anat-img{position:relative;display:inline-block;max-width:100%;line-height:0;border:1px solid var(--line2);border-radius:8px;overflow:hidden;background:var(--paper2)}
+.anat-img img{display:block;max-width:100%;height:auto}
+.anat-img .anat-co{position:absolute;transform:translate(-50%,-50%);min-width:20px;height:20px;padding:0 5px;border-radius:11px;background:var(--ox);color:#faf8f3;font-family:var(--serif);font-weight:700;font-size:11.5px;line-height:20px;text-align:center;box-shadow:0 0 0 2px #faf8f3,0 1px 3px rgba(0,0,0,.3)}
+.anat-imgsrc{margin-top:7px;font-size:11px;color:var(--muted);font-family:var(--sans)}
+.anat-imgsrc a{color:var(--ox)}
+.colophon{margin-top:60px;padding-top:20px;border-top:3px double var(--line2);font-size:12px;color:var(--faint)}
+/* 打印 / 导出 PDF：图与卡片不跨页截断，去链接下划线噪点 */
+@media print{
+ body{font-size:12pt} .page{max-width:none;padding:0 12mm 12mm}
+ .vizfig,.clayer,.vf-layer,.vf-pool,.figrow,.chart,.vchart,.tablewrap,.mermaid,.anat-board{break-inside:avoid;page-break-inside:avoid}
+ #content h1,#content h2{break-after:avoid}
+ a{color:var(--ink2)!important;border-bottom:none!important} a.tk-link::after{content:""}
+}
+</style></head>
+<body>
+<div class="page">
+ <div class="masthead">
+  <div class="kick">BCA 产业研究 · AI Applications & Agents · 2026Q2</div>
+  <h1>AI 应用与 Agent</h1>
+  <div class="standfirst">AI agent 不杀 SaaS，把它劈成控数据的两端 re-rate 向上、薄工作流席位压缩两半</div>
+  <div class="meta"><span><b>口径</b> 财务真调 yfinance 2026-06 · 收入 TTM</span><span><b>标的池</b> 26 只 L4 全覆盖</span><span><b>论断</b> 4 条·均当前证据一致/假设</span></div>
+ </div>
+ <div class="dash"><div class="dh">— 速览 / At a Glance —</div><div id="dashboard"></div></div>
+ <div id="content"></div>
+ <div class="colophon">BCA 双线投研系统 · industry-research · 数据真实性优先（拿不到标"→需补"，绝不编造）· ticker ↗ 跳 Yahoo Finance · 本文件为研究草稿，非投资建议。</div>
+</div>
+<script type="text/markdown" id="md"># AI 应用与 Agent — 产业研究
+
+*2026Q2 · 3 年视角 · 机构卖方 deep dive 风格*
+
+---
+
+## 目录
+
+- [〇、决策头页](#〇决策头页5-分钟入口)
+- [一、执行摘要](#一执行摘要)
+- [二、为什么是现在](#二为什么是现在)
+- [三、产业全景与双轴定位](#三产业全景与双轴定位生命周期--周期相位)
+- [四、产业链结构](#四产业链结构)
+- [五、价值链与利润池](#五价值链与利润池)
+- [六、关键 link 深度档案](#六关键-link-深度档案)
+- [七、地缘与政策约束](#七地缘与政策约束)
+- [八、标的图谱与估值数据](#八标的图谱与估值数据)
+- [九、风险、证伪与月度跟踪](#九风险证伪与月度跟踪)
+- [十、邻接产业与历史类比](#十邻接产业与历史类比)
+- [十一、结论与下一步](#十一结论与下一步)
+- [附录 A：跨 link 对比矩阵](#附录-a跨-link-对比矩阵)
+- [附录 B：完整 KPI 速查表](#附录-b完整-kpi-速查表)
+- [附录 C：信息源与方法论](#附录-c信息源与方法论)
+- [附录 D：紫苏叶清单](#附录-d紫苏叶清单金枪鱼-vs-紫苏叶)
+
+---
+
+# 〇、决策头页（5 分钟入口）
+
+*本节给 PM 的 5 分钟决策入口：只说变化、赔率、跟踪变量、反证与缺口，不出现正文没有的新数字。*
+
+**本期变化**：与 2025 年"AI 增强在位者、人人都涨"的共识相比，2026 年 1-2 月发生了一次结构性重定价（市场称 SaaSpocalypse）。Anthropic 推出 Claude Cowork 与自主法律/业务工作流后，软件板块在 2 月头一周蒸发逾 $1T 市值，自 1 月底累计蒸发逾 $2T，软件前瞻 P/E 跌至 22.7x，史上首次低于标普 500 整体倍数 [S8]。本研究的最大分歧不在"SaaS 会不会死"（不会），而在市场把整个篮子无差别抛售时，记录系统与薄工具的价值分叉尚未被充分定价。
+
+| 论断 | 一句话 | 状态 | 概率（理由）|
+|---|---|---|---|
+| 一 | agent 把软件劈成 fortress 上行 / 薄工具压缩两半 | 当前证据一致 | 高 0.65（座席与 NRR 已现分叉信号 [S6][S8]）|
+| 二 | agent 预订已起、收入确认滞后 4-8 季度 | 当前证据一致 | 中 0.60（Agentforce ARR 占 CRM 收入 <3% [S4]）|
+| 三 | 当下最实的 agentic ROI 是广告引擎而非企业 copilot | 当前证据一致 | 中 0.55（APP 收入端已兑现、企业 agent 仍在 booking [S7]）|
+| 四 | durable moat 在分发 + 推理基础设施 + 专有数据围栏 | hypothesis | 中 0.60（微软 E7 bundling + Action Fabric 刚落地 [S9][S19]）|
+
+**五个跟踪变量**（与 §9 对齐）：
+
+| 变量 | 当前值 | 危险阈值 | 数据源 |
+|---|---|---|---|
+| 软件板块前瞻 P/E | 22.7x（2026Q1）[S8] | <18x（二次杀估值）| IGV / FactSet 汇编 |
+| CRM Agentforce ARR | >$1B（Q1 FY27）[S4] | 连续两季环比 <20% | Salesforce 8-K |
+| NOW cRPO 同比 | +25%（21% cc，Q4'25）[S5] | <15% | ServiceNow 8-K |
+| APP 收入增速 | +59% YoY（Q1'26）[S7] | <25% YoY | AppLovin 财报 |
+| at-risk 组席位同比 | Atlassian 已首现负增长 [S8] | 三家以上转负 | 各公司财报 |
+
+**最大反方证据**：Gartner 预计至 2027 底逾 40% 的 agentic AI 项目将因成本失控、价值不清或风控不足被取消 [S21]；当前仅 17% 企业部署 agent、79% 宣称采用但仅 11% 进入生产 [S21]。若 agent 货币化大面积证伪，论断二（滞后但终将兑现）会先倒，届时赢家的牛市估值同样需要下修。
+
+**数据缺口声明**：(1) 行业级 agent 出货"量"无统一口径，本报告 §3.0c 用"龙头披露 agent ARR/ACV 加总"作 bottom-up 代理，覆盖约头部 5 家、并列二手市场规模交叉，属 T3 降级；(2) AppLovin e-commerce 收入为分析师估算（公司已不分项披露 vertical），C 级 [S7]；(3) 纯 agent 基础设施（eval/向量库/agent 身份）多为私有，附录 D 标"→需补"。
+
+---
+
+# 一、执行摘要
+
+*这一节是给只有 5 分钟时间的高管看的。如果只读这一节，应该能拿到 80% 的研究价值。*
+
+2026 年 2 月头一周，软件板块在七个交易日内蒸发逾 $1T 市值，是这一群体自 2022 年加息冲击与 2008 年金融危机以来最快的回撤之一；自 1 月底累计蒸发逾 $2T，软件前瞻 P/E 跌至 22.7x，史上首次跌破标普 500 整体倍数 [S8]。导火索并非某家公司的业绩暴雷，而是 Anthropic 推出 Claude Cowork 与一批自主法律/业务工作流后，市场第一次把"AI 不只帮人用软件、而是替代整类软件"当成可量化的现实来定价 [S8]。值得注意的是，这是一次情绪重定价而非经营崩塌：截至目前装机基础大体稳固，平均毛留存仍在 90% 以上 [S17]，股价下跌远超基本面恶化。这恰恰是产业研究的切入点：当整个篮子被无差别抛售，谁被错杀、谁被错抬，是未来三年 alpha 的来源。
+
+**本研究跟踪的 4 个核心论断**（来自自建 + Phase 1 机构共识）：
+
+- **论断 1**：AI agent 不会杀死 SaaS，而是把软件按"是否拥有专有工作流数据 + 系统级嵌入"劈成两半，记录系统（CRM/NOW/SAP/INTU/GWRE）靠 agent ARPU 扩张重新 re-rate 向上，参与/薄工作流系统（ASAN/MNDY/DOCU/ZM/U）面临席位压缩 → 验证位置 [§6 全 link + §8]。
+- **论断 2**：agent 的预订（ARR/RPO）已经起来，但收入确认滞后 4-8 季度；当前估值对赢家已 price-in 牛市、对输家 price-in 末日 → 验证位置 [§3.0c + §6.1]。
+- **论断 3**：当下被验证最充分、ROI 最硬的"AI 应用"不是企业 copilot，而是广告分配引擎（APP AXON / META Advantage+），它们已在收入端兑现 → 验证位置 [§6.2 + §5]。
+- **论断 4**：app 层 agent 正被基础模型商品化，真正的 durable moat 在两端，分发渠道（微软/CRM/NOW/META 的既有触达）与推理/编排基础设施（NET Workers AI），以及专有数据围栏（Action Fabric / SAP API policy / FICO 评分）→ 验证位置 [§6.3 + §7 + 附录 D]。
+
+四个论断之间存在清晰的先后与催化关系。论断 4（价值在两端、中间薄层被挤）是结构底座，它直接推导出论断 1 的分叉：拥有分发或专有数据的记录系统在结构上属"两端"、受益于 agent；薄工作流属被挤的"中间"、受损。论断 2 解释了为什么这场分叉在财报上还看不清，agent 收入确认滞后，导致基本面尚未印证估值已经定价的分歧，这正是错配窗口。论断 3 则是当下唯一一个"产业级 agentic ROI 已在收入端跑出来"的样本，它为整个 agent 叙事提供了存在性证明，同时也提醒：真金白银的兑现，目前发生在广告而非企业软件。
+
+标的发现 3 层（详见 §8）：(1) 命门/数据围栏层 = FICO、GWRE、INTU、NOW（专有确定性数据，agent 无法重生成）；(2) 在位 re-rate 层 = CRM、SAP、ADBE、NICE（agent ARPU 扩张 + 估值已被错杀到低位）；(3) 期权/兑现层 = APP（广告引擎已兑现）、NET（推理基础设施期权）、PATH（RPA→agentic 转型期权）。
+
+本报告全文约 20000 字 + 1 个 data.json 机器可读。建议阅读：基金 GP 看 §0 + §1 + §8 + §11（12 min）；行业研究员顺读全文（60-75 min）；地缘/监管分析师重点 §7 + §9。
+
+---
+
+# 二、为什么是现在
+
+*这一节回答"why now"。*
+
+一个数字最能说明此刻的紧迫：Gartner 预计到 2026 年底，40% 的企业应用将内嵌任务专用 AI agent，而 2025 年这一比例还不到 5% [S1]。从不到 5% 到 40% 的一年跳跃，意味着每一个企业软件品类都将在 2026 年被迫回答同一个问题，当一个 agent 能干十个人的活，按人头收费的逻辑还成不成立。微软 CEO Nadella 已经把答案挑明：席位正在变成"对某种用量的一纸入场券"[S6]。这不是远期预言，而是正在发生的定价革命：Atlassian 在 2026 年报告了历史上第一次企业席位数下降，主因正是 AI agent 替代了原本需要专人操作 Jira/Confluence 的任务 [S8]。
+
+这并非孤立现象。一组数据勾勒出席位经济的瓦解速度：按 Pilot 研究，纯席位制软件公司占比在 12 个月内从 21% 降到 15%，混合定价（固定底座 + 变量用量）从 27% 升到 41% [S6]；IDC 进一步预测到 2028 年纯席位制将被淘汰、70% 厂商重构定价 [S6]。定价模型重构的背后是单位经济学的断裂：传统 SaaS 服务一个用户的边际成本近乎固定，所以按人头收费成立；而 AI 时代每一次推理调用都有 token 成本，重度用户可能花掉轻度用户 10 倍的钱，一刀切定价会让最好的客户摧毁毛利 [S6]。
+
+更值得关注的是时间窗口。三个催化在 2026 上半年同时落地。第一，分发巨头加速 bundling：微软 M365 E7 + Agent 365 于 2026 年 5 月 1 日 GA，$99/用户/月打包 E5 + Copilot + Entra Suite + Agent 365，是自 2016 年 E5 以来最大的一次许可变更，分析师直接称之为"SaaS 大整合"[S9]。第二，记录系统开始为自己的数据筑墙：ServiceNow 推出 Action Fabric，要求外部 agent 必须经此层才能访问平台数据与执行工作流；SAP 则禁止未经授权的自主 AI 调用其 API，把自家 Joule 放在许可一侧 [S19]。第三，广告侧的 agentic 引擎跑出了第一个产业级 ROI 样本：AppLovin 的 AXON 在 2026 年 6 月首次对公众开放自助投放，把 14 年来只服务直客的引擎向 e-commerce 全面铺开 [S7]。
+
+本研究的边界。本报告聚焦"AI 应用与 Agent"这一软件应用层（含横向记录系统、垂直 agent、协作工具、广告引擎、推理基础设施），不展开底层算力/芯片（属邻接的 AI 数据中心赛道）与基础大模型本身（OpenAI/Anthropic 等多为私有，仅作上游约束讨论）。截图给定的 26 只 L4 标的池全部纳入 §8 图谱并在 §4-§6 找到产业链归宿。本研究止于行业逻辑、上下游与标的寻找，不输出仓位、目标价与买卖评级。
+
+---
+
+# 三、产业全景与双轴定位（生命周期 × 周期相位）
+
+*这一节建立产业的"心智模型"，并做双轴定位：① 生命周期（结构性）+ ② 当前周期相位（周期性）。*
+
+<!--VIZ:cycle-->
+
+AI 应用与 Agent 是一个被两股力量同时拉扯的产业。从绝对规模看，它坐落在全球软件这个 ~$430B 的大盘里 [S6]，而 AI 本身是一个更大的容器，Gartner 估 2026 年全球 AI 支出约 $2.59T（+47% YoY），占全部 IT 支出 $6.31T 的约 41% [S2]。但要把"agentic AI 软件"这个细分单独拎出来，口径立刻分化：Mordor、Grand View 等给出的纯 agentic AI 软件市场 2026 年约 $9.1-10.9B（2025 年约 $7-7.6B），40%+ CAGR，2031 年达 $57B、2034 年 $139B（Grand View 40.5% CAGR）至 $324B（Allied 44% CAGR）[S3]。这三组数字（$2.59T 全 AI 支出、$450B 到 2035 年的企业应用软件 agent 收入、$10B 的纯 agentic 软件市场）不是同一个市场，而是三个正交的测量，引用时必须言明口径 [S2][S3]。
+
+## 3.0 轴①：生命周期阶段（结构性）
+
+阶段诊断是**成长早期（早期采用向早期大众过渡）**。五维证据指向同一结论。其一，渗透率极低且斜率陡峭：企业应用内嵌 agent 从 <5% 跳向 40%（2025→2026E），但真正进入生产的仅 11% [S21]，说明品类远未饱和。其二，增速分化但头部仍高速：Salesforce Agentforce ARR 一年增长 169% 至 $800M（FY26Q4），随后突破 $1B（FY27Q1，+205% YoY）[S4]，ServiceNow Now Assist ACV 一年翻倍冲击 $1B 目标 [S5]。其三，模式创新活跃：定价从席位制裂变出用量、结果、信用点、agent-as-employee 四种新模型 [S6]。其四，利润集中度高度悬殊：广告引擎（APP 调整后 EBITDA 利润率 85% [S7]）与薄工具（多家亏损或微利）天差地别。其五，一级融资与并购同步升温：NICE 以 $955M 收购 Cognigy、UiPath 收购 WorkFusion [S14][S18]，Pega/GitLab 被点名为并购标的 [S12]。
+
+这个阶段意味着什么？值得注意的是，成长早期叠加技术路线未定，最大的特征是"赢家尚未锁定、但输家已经可识别"。市场对 agent 终局价值在应用、agent、数据还是基础设施哪一层累积没有共识 [S17]，这正是它把整个软件篮子的折现率一齐抬高、无差别杀估值的根因 [S17]。对配置者而言，这种"方向确定、归属未定"的阶段，奖励的是能识别结构性受损者（薄工具）与结构性受益者（数据围栏）的差异化，而非押注某个单一赢家。
+
+## 3.0b 轴②：当前周期相位（周期性·V2.6）
+
+与此同时，软件/SaaS 的主导周期是**资本 + 估值周期**（不同于硬件的产能+库存）。当前相位判断为**收缩后的触底重估区**。证据有三：其一，估值已从高位剧烈收缩，软件前瞻 P/E 跌至 22.7x、史上首次低于标普 500，IGV 自高点 -22%，相对标普为软件史上最差回撤 [S8]。其二，经营基本面尚未跟随崩塌，毛留存仍 ≥90% [S17]，多年增速放缓（SaaStr 称公开 SaaS 增速自 2021 峰值每季下滑）是底层柴火、AI agent 是加速剂 [S8]。其三，定价模型正处迁移的阵痛期，客户在 12-24 个月内为同一份活付两次钱（旧席位 + 新 agent 用量），TCO 一度上升 30%+ [S6]，这压制了近端利润、放大了估值的不确定性。
+
+<!--VIZ:trend-->
+
+<!--VIZ:benchbar-->
+
+**拐点信号速查表**（前瞻触发器）
+
+| 类型 | 信号 | 当前状态 / 阈值 |
+|---|---|---|
+| ⚠ 危险（→二次杀估值）| 软件前瞻 P/E 进一步下探 | 22.7x；跌破 18x 触发 [S8] |
+| ⚠ 危险 | at-risk 组席位同比转负扩散 | Atlassian 已首现，三家以上转负即恶化 [S8] |
+| ✓ 安全（重估可持续）| agent ARR 占总收入开始爬升 | Agentforce 占 CRM <3%，升破 5% 是兑现起点 [S4] |
+| ✓ 安全 | cRPO/RPO 同比维持高位 | NOW cRPO +25% [S5]，维持 >15% |
+| ◉ 关键观察 | Gartner agentic 项目取消率 | 预计 2027 底 >40% 取消 [S21] |
+| ◉ 关键观察 | 微软 E7 bundling 渗透速度 | E7 GA 2026-05，>200 席位企业经济性占优 [S9] |
+
+**历史对标**：最贴切的类比不是 2000 年互联网，而是 2002-2009 报纸业被互联网颠覆，报纸群体 2002-2009 间损失约 95% 价值，直到前瞻盈利预期完全重置到新现实才企稳 [S8]。含义是：软件要找到持久的估值底，盈利预期必须先稳定下来。但两者关键差异在于，报纸的核心资产（读者注意力）被整体迁移，而软件的核心资产（专有工作流数据 + 合规嵌入）对一部分玩家仍然不可被 agent 重生成 [S17]，故这次的终局不是整体归零，而是分叉。
+
+## 3.0c 量价拆分：行业量纲层（V2.12 · 量·率·期）
+
+软件业没有统一的物理"出货量"，本节按量纲字典把"互联网/软件"路由到 MAU/ARR/RPO 三件套，并诚实降级为"龙头披露 agent 指标 bottom-up 加总"作行业量代理，覆盖头部约 5 家、与二手市场规模并列交叉。**量**：以纯 agentic AI 软件市场规模作行业总量时序（年度，单一频率），2024E ~$5B → 2025 ~$7.3B → 2026 ~$10B，YoY 约 +40-46% [S3]；底层兑现量以龙头 agent ARR 加总印证，CRM Agentforce ARR $0→$0.8B→$1B+（一年内）[S4]、NOW Now Assist ACV 翻倍冲 $1B [S5]、UiPath 总 ARR $1.85B [S18]、NICE AI 与自助 ARR $328M（+66% YoY）[S14]。**率**：效率指标看 NRR 与 agent ARPU，记录系统 cRPO 维持 +25%（NOW）[S5]、Pega Cloud ACV +29% [S12]，薄工具 NRR 承压、Atlassian 席位转负 [S8]。**期**：前瞻量看 RPO/cRPO 与 guidance，NOW cRPO $12.85B（+25% YoY）[S5]、CRM Q2 FY27 cRPO 指引约 +13% cc [S4]，龙头 guidance 隐含增速（CRM ~13%、NOW ~20%）显著高于薄工具组（MNDY FY 指引降速到 +19-20%，2025 还是 27% [S15]），背离 >10pp，印证份额从薄工具向记录系统抢夺。
+
+**行业量纲速查表**
+
+| 维度 | 指标 | 最新期 | 1 年前 | 同比 | 来源 |
+|---|---|---|---|---|---|
+| 量 | agentic AI 软件市场（$B/年）| ~10（2026E）| ~7.3（2025）| +37% | Mordor/Grand View [S3] |
+| 量（兑现）| 龙头 agent ARR 加总（$B）| ~3.5（CRM+NOW+PATH 等）| ~1.0 | +250% | 各财报 [S4][S5][S18] |
+| 率 | NOW cRPO 同比 | +25%（21% cc）| — | — | ServiceNow 8-K [S5] |
+| 期 | NOW cRPO（$B）| 12.85（2026 锁定）| ~10.3 | +25% | ServiceNow 8-K [S5] |
+
+**量×价对账**：行业量（$10B agentic 软件）远小于龙头 agent ARR 加总（~$3.5B）所隐含的口径，因为二者口径不一致：前者是"纯 agentic 独立软件"狭义口径，后者把 agent 功能嵌入既有订阅一并计入。这正说明 agent 货币化的主战场不是独立 agentic 软件市场，而是嵌入记录系统的 ARPU 扩张（论断 2 的产业级注脚）。本研究采用龙头加总作为兑现度主锚、二手市场规模仅作交叉，口径差异已显式说明。
+
+## 3.1 市场规模自下而上三角验证（V2.4）
+
+二手 market-research（Mordor/Grand View/Allied）的 agentic AI TAM 口径混乱、互相打架（2034 年 $139B vs $324B，差 2.3 倍）[S3]，只能作交叉参考。本节用自下而上锚定可寻址市场：
+
+自下而上推算 = 全球企业知识工作者数 × 可及渗透率 × 单座 agent 年化支出。以约 8 亿全球知识工作者为基数，假设 2029 年企业 agent 渗透率达 15%（Gartner 调查中 60% 企业称两年内部署、但取消率高，取保守 15%）[S21]，单座年化 agent 支出按当前 Agentforce $2/对话、Adobe $19.99/4000 信用点、Intuit 用量计费等折算约 $1,500-2,500/座，得自下而上 TAM ≈ 8亿 × 15% × $2,000 ≈ $240B（2029E）。这与 Gartner"2035 年 agent 驱动 $450B 企业应用软件收入"[S2] 在斜率上自洽，远高于纯 agentic 软件 $57B（2031E）的狭义口径 [S3]，差异来源是口径：自建口径计入嵌入既有订阅的 agent ARPU，狭义口径只算独立 agentic 产品。
+
+| TAM 口径 | 数值 | 来源 | 可信度 |
+|---|---|---|---|
+| 自下而上（本研究自建·主锚）| ~$240B（2029E）| 8亿知识工作者 × 15% × $2,000 | ⭐⭐⭐⭐ |
+| 二手 A（企业应用 agent 收入）| $450B（2035E）| Gartner [S2] | ⭐⭐⭐ |
+| 二手 B（纯 agentic 软件）| $57B（2031E）| Mordor [S3] | ⭐⭐ |
+
+选自下而上为主锚，因其乘数可溯源（知识工作者数、渗透率、单座支出均有锚）；二手口径虚高/偏低源于"嵌入式 vs 独立式"的统计边界差异。
+
+---
+
+# 四、产业链结构
+
+*这一节让读者看清整条产业链 7 层结构 + 谁卡谁。*
+
+整个 AI 应用与 Agent 产业链可分为 7 层结构，从最上游的算力与基础模型，到最下游的企业买家与商业模式，每一层的寡占特征与议价权差异极大。和制造业产业链不同，软件链的"卡脖子"不在物理材料，而在分发渠道、专有数据与推理基础设施这三处无形资产。下面的 ASCII 全景图在每一层标注了关键玩家、国别集中度与卡脖子等级。
+
+<!--VIZ:chain-->
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                    AI 应用与 Agent 产业链全景（2026Q2）                          │
+│          符号：⭐ 卡脖子度 / ◆ 美国 / ● 日韩欧 / ▲ 中国 / ◇ 资源/私有              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+【第零层：算力 / 基础模型 / 推理基础设施】 ⭐⭐⭐⭐⭐
+┌────────────────────────────────────────────────────────────────────┐
+│ ◆ NVDA 加速器(80%+ 训练) · ◆ AWS/Azure/GCP 超大规模云                  │
+│ ◆ OpenAI/Anthropic/Google 基础模型(私有/GOOGL) · ◆ NET Cloudflare      │
+│   Workers AI 边缘推理 + AI Gateway 控制层 🌿                           │
+└────────────────────────────────────────────────────────────────────┘
+                                  ▼
+【第一层：agent 框架 / 编排 / 中间件】 ⭐⭐⭐
+┌────────────────────────────────────────────────────────────────────┐
+│ ◇ LangChain/LlamaIndex(私有) · ◆ MSFT Agent 365/Copilot Studio        │
+│ ◆ NET Agents SDK · ◇ eval/observability(Braintrust 私有 →需补)         │
+└────────────────────────────────────────────────────────────────────┘
+                                  ▼
+【第二层：⭐⭐⭐⭐⭐ 分发渠道 + 专有数据围栏】（利润与控制核心）
+┌────────────────────────────────────────────────────────────────────┐
+│ ◆ MSFT M365 E7 bundling($99) · ◆ CRM Agentforce/Data Cloud            │
+│ ◆ NOW Action Fabric(数据围栏) · ● SAP API policy/Joule · ◆ META 分发   │
+└────────────────────────────────────────────────────────────────────┘
+                                  ▼
+【第三层：横向记录系统 / agentic 平台】 ⭐⭐⭐⭐
+┌────────────────────────────────────────────────────────────────────┐
+│ ◆ CRM Salesforce · ◆ NOW ServiceNow · ● SAP · ◆ WDAY Workday          │
+│ ◆ INTU Intuit(50M tx/周) · ◆ HUBS HubSpot                             │
+└────────────────────────────────────────────────────────────────────┘
+                                  ▼
+【第四层：垂直 / 职能 agent 应用】 ⭐⭐⭐⭐
+┌────────────────────────────────────────────────────────────────────┐
+│ ◆ FICO 决策评分(de facto 标准)🌿 · ◆ GWRE 保险核心系统🌿                │
+│ ◆ PEGA BPM/Blueprint · ◆ NICE CX/Cognigy · ◆ ADBE Firefly · ◆ DUOL    │
+│ ◆ PATH RPA→agentic · ◆ ADSK 设计 · ◆ U Unity 游戏引擎                  │
+└────────────────────────────────────────────────────────────────────┘
+                                  ▼
+【第五层：协作 / 参与 / 薄工作流 SaaS】 ⭐⭐（at-risk 组）
+┌────────────────────────────────────────────────────────────────────┐
+│ ◆ ASAN Asana · ◆ MNDY monday · ◆ DOCU DocuSign · ◆ ZM Zoom            │
+│ ◆ GTLB GitLab · ◆ TWLO Twilio · ◆ BILL · ◆ AI C3.ai(待证)             │
+└────────────────────────────────────────────────────────────────────┘
+                                  ▼
+【第六层：广告 / 推荐 agentic 引擎】 ⭐⭐⭐⭐（收入已兑现·平行流）
+┌────────────────────────────────────────────────────────────────────┐
+│ ◆ APP AppLovin AXON(85% EBITDA 率) · ◆ META Advantage+                │
+└────────────────────────────────────────────────────────────────────┘
+                                  ▼
+【第七层：企业买家 + 商业模式】
+┌────────────────────────────────────────────────────────────────────┐
+│ 定价范式迁移：席位制 → 用量/结果/信用点/agent-as-employee              │
+│ TCO 过渡期 +30%（旧席位 + 新 agent 用量双付 12-24 月）                 │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+**全景图一句话解读**：AI 应用与 Agent 产业链是「**美国控分发与记录系统（第二、三层）+ 美国控广告引擎（第六层）+ 私有/基础模型控上游（第零层）+ 推理基础设施成新命门（第零-一层 NET）**」的美国高度集中结构。整条链最值钱的不在 app 层本身，而在第二层的分发渠道与数据围栏，微软用 $99 E7 把竞品挤成"分开买不划算"[S9]，ServiceNow 用 Action Fabric 给自己的数据筑墙 [S19]，这两处是 agent 时代真正的利润与控制核心。
+
+> 🌿 **紫苏叶标注**：本链的金枪鱼是 CRM/NOW/META（最贵、人尽皆知）。紫苏叶藏在两处不可采购的命门，FICO（信用决策评分是监管嵌入的 de facto 标准，agent 无法重生成历史评分数据）与 NET 的 AI Gateway（多模型推理控制层，agent 工作流的延迟命门，GPU 利用率平均仅 20-40%、用量计费天然契合 [S10]）。完整汇总见[附录 D](#附录-d紫苏叶清单金枪鱼-vs-紫苏叶)。
+
+为精确展示节点依赖，下面是 Mermaid 多层图，红色高亮为 Top 卡脖子节点。
+
+```mermaid
+flowchart TD
+  L0[算力/基础模型/推理基础设施]:::bottleneck --> L1[agent 框架/编排]
+  L1 --> L2[分发渠道+数据围栏]:::bottleneck
+  L2 --> L3[横向记录系统 CRM/NOW/SAP]
+  L3 --> L4[垂直 agent FICO/GWRE/PEGA]:::bottleneck
+  L4 --> L5[协作薄工作流 ASAN/MNDY/DOCU]
+  L3 --> L6[广告引擎 APP/META]
+  L5 --> L7[企业买家+商业模式迁移]
+  L6 --> L7
+classDef bottleneck fill:#ff6b6b,stroke:#000,stroke-width:3px,color:#fff
+```
+
+这张图揭示了一个反直觉事实：链条上游（算力、推理）与第二层（分发、数据围栏）是真正的卡脖子，而处在"中间"的协作薄工作流（第五层）虽然离用户最近、品牌最响，却议价权最弱，它既不掌握分发，也没有 agent 无法重生成的专有数据，正是被两端挤压的"中间层"[S17]。
+
+## 4.1 上中下游如何回应核心论断（V2.0）
+
+七层结构对四个论断给出了清晰的产业级映射。论断 1（分叉）的物质载体横跨第三、四、五层：第三、四层（记录系统 + 垂直确定性 agent）拥有分发或专有数据、属"两端"，第五层（薄工作流）属被挤的"中间"，整条传导链就是分叉的产业证据，同样卖软件，FICO 的 PS 12.2 与 ASAN 的 PS 2.0 [真调] 反映的正是市场对"数据围栏 vs 薄工具"的定价分歧。论断 2（货币化滞后）的验证位置在第二、三层与第六层的对比：第六层广告引擎收入已兑现（APP +59% YoY [S7]），而第二、三层企业 agent 仍在 booking（Agentforce ARR 占 CRM 收入 <3% [S4]），同一产业链上"已兑现"与"待兑现"并存。论断 3（广告引擎最实）直接锚在第六层。论断 4（命门在两端）由第零、一、二层共同验证：推理基础设施（NET）、分发（MSFT/CRM）、数据围栏（NOW Action Fabric / SAP API policy）三处恰是 agent 无法绕过的咽喉。
+
+| 论断 | 主要验证位置（产业链层级 + 玩家）| 次要验证 / 反驳信号 |
+|---|---|---|
+| 论断 1 | 第三/四层（CRM/NOW/FICO）vs 第五层（ASAN/MNDY）的估值分叉 | 反驳：若薄工具 NRR 维持 >105% |
+| 论断 2 | 第二/三层 agent ARR 占总收入 <10%（CRM/NOW）| 反驳：任一龙头 agent 收入占比 >15% |
+| 论断 3 | 第六层 APP/META 收入端兑现 | 反驳：APP H2 增速跌破 25% |
+| 论断 4 | 第零/一/二层（NET/MSFT/NOW 数据围栏）| 反驳：bundling 未致席位负增长且 NET PS <15x |
+
+---
+
+# 五、价值链与利润池
+
+*这一节回答："这个产业的钱从哪来到哪去？最终落在谁口袋？未来 3 年迁移方向？"*
+
+如果用一句话概括这个产业的利润分布，那就是：**钱从企业 IT 预算流入，但利润正在从"卖席位的中间层"向"控分发的两端 + 控专有数据的垂直层"迁移**。当前的利润格局极不均衡：广告引擎以 85% 的调整后 EBITDA 利润率独占鳌头（APP）[S7]，记录系统以高 FCF yield + 高留存稳坐第二（CRM FCF yield 12.8%、ADBE 11.4% [真调]），而协作薄工具多数微利或亏损（ASAN、GTLB、C3.ai 仍在亏损 [真调]）。agent 浪潮没有改变"利润集中在两端"的结构，反而强化了它，因为 agent 进一步抬高了"分发 + 数据"的价值、压低了"纯界面"的价值 [S17]。
+
+## 5.1 价值传导 / 上下游利润流图（V1.9.2）
+
+下图把"企业 IT 预算 → 各层拆分 → 最终利润沉淀点"完整还原。钱怎么从企业买家流向上游、又最终聚集在哪几个口袋，是理解利润迁移方向的关键。
+
+<!--VIZ:valueflow-->
+```
+┌────────────────────────────────────────────────────────────────────────────────┐
+│  ↓↓↓ AI 应用与 Agent 产业资金流总览（企业软件 IT 预算 → agent 用量）↓↓↓           │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+  【企业买家 — 全球软件 IT 支出 ~$430B 大盘 / agentic 软件 ~$10B 细分】
+        ╲   + AI 总支出 $2.59T 外溢（算力/模型/数据）
+         ╲   + 定价迁移：席位 → 用量/结果/信用点
+          ▼
+ ┌────────────────────────────────────────────────────────────────────┐
+ │  ① 横向记录系统   收入大 / FCF 厚 / 净利率中高                        │ ◄── 收入与现金最大
+ │     • CRM 收入 $42.8B / FCF yield 12.8%                              │     利润稳
+ │     • SAP $37.3B / NOW $14.0B / INTU $20.9B [真调]                    │
+ └─────┬──────────────────────────────────────────────────────────────┘
+       │  agent 功能嵌入既有订阅 → ARPU 扩张（Agentforce/Now Assist）
+       ▼
+ ┌────────────────────────────────────────────────────────────────────┐
+ │  ② 分发渠道 + 数据围栏（卡脖子）净利率最高 ⭐⭐⭐⭐⭐                    │ ◄── 利润池 #1
+ │     • MSFT M365 E7 $99 bundling（挤压竞品）[S9]                       │     控制力最强
+ │     • NOW Action Fabric / SAP API policy（数据收费闸）[S19]           │
+ │     ⭐ 关键：不直接产生 app 收入，但决定谁能触达企业数据 = 终极议价权    │
+ └─────┬──────────────────────────────────────────────────────────────┘
+       │
+       ▼
+ ┌────────────────────────────────────────────────────────────────────┐
+ │  ③ 垂直确定性 agent   收入中 / 净利率高 / 专有数据护城河              │
+ │     • FICO PS 12.2 / GWRE PS 7.1（监管嵌入数据）[真调]                │
+ │     • PEGA / NICE / ADBE Firefly（信用点razor-blade）                 │
+ └─────────────────────────────────────────────────────────────────────┘
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+   平行流：与主链并行
+
+ ┌────────────────────────────────────────────────────────────────────┐
+ │  ④ 广告 / 推荐 agentic 引擎 ⭐⭐⭐⭐⭐                                  │ ◄── 利润池 #2（已兑现）
+ │     • APP AXON 调整后 EBITDA 率 85% / FCF $1.29B/季 [S7]              │
+ │     • META Advantage+（巨头分发 + AI 投放）                           │
+ └─────────────────────────────────────────────────────────────────────┘
+
+ ┌────────────────────────────────────────────────────────────────────┐
+ │  ⑤ 推理基础设施 ⭐⭐⭐⭐（agent 期权）                                  │ ◄── 利润池 #3（未来）
+ │     • NET Workers AI / AI Gateway（用量计费 + 边缘延迟命门）[S10]      │
+ └─────────────────────────────────────────────────────────────────────┘
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ⭐⭐⭐⭐⭐ 钱最终沉淀在哪？利润真正聚集的 4 个位置
+  ┌────────────────────────────────────────────────────────────────────┐
+  │  1) 广告引擎（APP/META）         极高利润率 + 已兑现       ⭐⭐⭐⭐⭐│
+  │  2) 分发渠道 + 数据围栏（MSFT/NOW/CRM 数据层） 终极议价权  ⭐⭐⭐⭐⭐│
+  │  3) 记录系统现金流（CRM/SAP/INTU 高 FCF）       稳厚利     ⭐⭐⭐⭐│
+  │  4) 垂直确定性数据（FICO/GWRE）  不可重生成护城河          ⭐⭐⭐⭐│
+  └────────────────────────────────────────────────────────────────────┘
+  其余薄工作流（第五层）多数微利或亏损，是被两端挤压的中间层。
+```
+
+**价值传导图一句话解读**：AI 应用与 Agent 产业是「**企业预算 $430B → 记录系统厚现金 → 分发/数据围栏控议价 → 垂直数据筑墙 + 平行的广告引擎已兑现 + 推理基础设施期权**」的多层利润传导结构。利润正从中间薄工具向两端迁移，这是 agent 时代最重要的资金流方向 [S17]。
+
+## 5.2 链节利润池详表
+
+更具体地按链节拆解，整个产业的利润分布如下：
+
+| 链节 | 营收占比（相对）| 利润集中度 | 净利率/效率 | 利润中心 |
+|---|---|---|---|---|
+| 广告引擎（第六层）| 中 | ⭐⭐⭐⭐⭐ | EBITDA 85% [S7] | APP/META |
+| 分发+数据围栏（第二层）| 高 | ⭐⭐⭐⭐⭐ | 议价权（非直接 app 收入）| MSFT/NOW/CRM |
+| 记录系统（第三层）| 最高 | ⭐⭐⭐⭐ | FCF yield 10-13% [真调] | CRM/SAP/INTU |
+| 垂直确定性 agent（第四层）| 中 | ⭐⭐⭐⭐ | PS 7-12x 溢价 [真调] | FICO/GWRE/PEGA |
+| 推理基础设施（第零层）| 小 | ⭐⭐⭐ | 用量计费/期权 | NET |
+| 协作薄工作流（第五层）| 中 | ⭐⭐ | 微利/亏损 [真调] | ASAN/MNDY/DOCU |
+
+这张表揭示了一个常被忽视的事实：营收规模与利润集中度并不一致。记录系统营收最大但利润集中度让位于广告引擎与数据围栏；薄工作流营收不小，却处在利润链的最底端。原因在于 agent 把"功能"商品化了，能被 AI 重生成的界面价值塌缩，而分发、专有数据、已验证的 ROI 引擎价值放大 [S17]。
+
+至于成本结构，agent 时代单位经济学最大的变量是推理成本（token）。一个典型 agent 任务可能串联十次模型调用，单家厂商若补贴推理（如 Duolingo Max 的 AI 功能因重度使用推高推理成本、2026 EBITDA 利润率从 29% 压到 ~25% [S16]），毛利承压；若转嫁给客户（Adobe 信用点 razor-blade、Intuit 用量计费 [S11]），则面临定价阻力。赢家是那些能在规模上把 agent 驱动收入做到 70%+ 毛利的平台 [S17]。
+
+| 环节 | 成本驱动 | 关键数据 | 卡脖子等级 |
+|---|---|---|---|
+| 推理（token）| 每次调用计费 | GPU 利用率均 20-40% [S10] | ⭐⭐⭐⭐ |
+| 分发触达 | 既有渠道 | 微软 E7 $99 挤压 [S9] | ⭐⭐⭐⭐⭐ |
+| 专有数据 | 历史积累 | FICO/GWRE 不可重生成 | ⭐⭐⭐⭐⭐ |
+| 销售获客 | CAC | Duolingo 口碑获客低 CAC [S16] | ⭐⭐ |
+
+未来 3 年，利润池将向**分发渠道 + 推理基础设施 + 专有数据围栏**三处加速迁移。记录系统中那些拥有分发或不可重生成数据的（CRM/NOW/SAP/FICO/GWRE）会通过 agent ARPU 扩张分到迁移红利；薄工作流若无法在 2027 年前转出席位制、建立用量/结果定价并守住毛利，会持续失血 [S6][S17]。这条迁移路径是后续 §6 link 排序与 §8 标的分层的底层逻辑。
+
+---
+
+# 六、关键 link 深度档案
+
+*这一节是研究的"肉"。对 8 个 Tier 1 link 各写完整深度档案，每个 1000-1500 字。从最高优先级排到最低。*
+
+---
+
+## 6.1 Link 1: 横向记录系统与 Agentic 平台（CRM / NOW / SAP / WDAY）
+
+**速览**：产业链第三层、利润与现金核心 · 估值判断：1 级（agent ARR booking）领先 / 2 级（收入确认）滞后 · 优先级 P0 · Top 标的 CRM / NOW / SAP
+
+**对应论断**：直接验证论断 1（fortress 上行）+ 直接验证论断 2（货币化滞后）
+
+横向记录系统是企业运行的"操作系统"，CRM 管销售、NOW 管 IT 与工作流、SAP 管 ERP、WDAY 管 HR 与财务。它们的共同点是拥有企业的权威数据集与合规框架，这正是 agent 无法重生成的资产 [S17]。在 agent 时代，这层的核心叙事从"卖席位"转向"卖 agent 工作单元"：Salesforce 把战略重定义为"Agentic CRM"，ServiceNow 自称"企业重塑的 AI 控制塔"[S4][S5]。它们的命脉在于，agent 要在企业里干活，必须调用这些系统里的真实数据与确定性工作流，而非凭空生成，这给了记录系统在 agent 价值链里的结构性位置。
+
+这层的发展史是一部"从订阅到 agent ARPU 扩张"的进化史。过去十年记录系统靠 SaaS 订阅 + 席位扩张增长；2024-2025 年它们集体嵌入 AI（Einstein/Now Assist/Joule）；2026 年进入 agent 货币化元年。当前生命周期处于成长成熟交界，基础订阅成熟（CRM 收入 $42.8B、SAP $37.3B [真调]），但 agent 层刚起步、增速极高（Agentforce ARR FY26Q4 +169% 至 $800M、FY27Q1 突破 $1B、+205% YoY [S4]）。这种"成熟基座 + 高增新层"的结构，是记录系统区别于纯成长或纯价值股的关键。
+
+谁在玩、谁卡在哪？Salesforce 的 Agentforce 在 FY26 Q4 达 ARR $800M（+169% YoY）、29,000 笔交易（环比 +50%），Agentforce + Data Cloud 合计 ARR $2.90B（+200% YoY），且 >60% 交易来自存量客户，交叉销售印证了分发优势 [S4]。到 FY27 Q1，Agentforce ARR 突破 $1B、AI + 数据合计 ARR $3.4B、交付 38 亿个 Agentic Work Units [S4]。ServiceNow 在 CY2025 Q4 订阅收入 $3,466M（+21% YoY），Now Assist ACV 翻倍冲击 $1B 目标，244 笔 >$1M 净新增 ACV 交易（+~40% YoY），cRPO 达 $12.85B（+25% YoY）[S5]。卡点在于：这些 agent 收入虽增速惊人，但绝对占比仍极小，Agentforce $1B ARR 相对 CRM $42.8B 收入不足 3%，这就是论断 2 所指的"预订已起、确认滞后"。
+
+⭐ **1 级 vs 2 级估值错配**：这是本 link 最值得关注的地方。市场在 SaaSpocalypse 中把记录系统与薄工具一齐抛售，但两者的产业链位置截然不同。真调数据显示，CRM 当前 PE 18.4x、FCF yield 12.8%，SAP PE 21.9x、INTU PE 16.3x [真调]，这是把高留存、厚现金、且正在 agent ARPU 扩张的记录系统，定价到了接近市场平均甚至以下。对比之下，ServiceNow PE 58.5x、EV/EBITDA 34.2x [真调] 仍是高估值，反映市场对其 agent 兑现度给了更高溢价。一个直观的错配信号：Salesforce 现以约 14x 前瞻 PE 交易、ServiceNow 约 25x [S4]，两者同处 agent 货币化第一梯队，但定价差异巨大，市场对"谁的 agent 兑现更快"押注分化。错配的核心在于：1 级看 booking（cRPO +25%、Agentforce ARR +205%、FY27Q1）极强，2 级看当期收入确认（占比 <5%）尚弱，估值在两者之间摇摆。
+
+护城河与风险。记录系统的护城河是高切换成本 + 专有数据 + 合规框架，这在 agent 时代被强化而非削弱 [S17]。但风险同样实在：第一，微软 E7 bundling 对 CRM/NOW 的部分功能构成挤压 [S9]；第二，agent 货币化若大面积证伪（Gartner 称 2027 底 40% 项目取消 [S21]），当期估值的牛市定价需下修；第三，记录系统自身在为数据筑墙（Action Fabric）引发用户组（DSAG）与生态反弹 [S19]，过度收费可能反噬开放性。综合看，这是"方向最确定、但兑现时点未到"的一层。
+
+为方便事实速查，关键数据汇总如下：
+
+| 维度 | 数据 |
+|---|---|
+| 当前层收入规模 | CRM $42.8B / SAP $37.3B / NOW $14.0B / INTU $20.9B [真调] |
+| agent ARR 增速 | Agentforce +205% YoY（$1B+·FY27Q1）[S4] |
+| 货币化占比 | Agentforce ARR / CRM 收入 <3% [S4] |
+| cRPO 同比 | NOW +25%（21% cc）[S5] |
+| 估值区间 | PE 16-58x（CRM 18.4 / SAP 21.9 / NOW 58.5）[真调] |
+| 护城河 | 专有数据 + 合规 + 切换成本（agent 时代强化）[S17] |
+
+| 关键玩家 | 国 | 上市 | Ticker | 市值(约) | 估值标注 |
+|---|---|---|---|---|---|
+| Salesforce | 美 | 是 | CRM | $130B | PE 18.4 / FCF 12.8% 被错杀 [真调] |
+| ServiceNow | 美 | 是 | NOW | $101B | PE 58.5 高溢价 [真调] |
+| SAP | 德 | 是(ADR) | SAP | $183B | PE 21.9 欧洲 ERP 龙头 [真调] |
+| Workday | 美 | 是 | WDAY | $31B | PE 38.8 HR/财务 [真调] |
+| Intuit | 美 | 是 | INTU | $73B | 50M tx/周数据图谱 [S11] |
+
+**推荐动作与入场**。本 link 是 P0 优先级，但内部分化明显。从产业链逻辑看，被错杀的厚现金记录系统（CRM PE 18.4x、SAP PE 21.9x）相对其分发优势与 agent ARPU 扩张潜力，定价已接近市场平均，是分叉论断里"两端"的核心受益者。后续个股深研（/deepdive）应优先验证：(1) agent ARR 占总收入的爬升斜率（升破 5% 是兑现起点）；(2) E7 bundling 的实际 displacement 程度。本节只描述错配结构，不给仓位与目标价。
+
+---
+
+## 6.2 Link 2: 广告 / 推荐 Agentic 引擎（APP / META）
+
+**速览**：产业链第六层平行流、唯一收入已兑现的 agentic ROI · 估值判断：1 级（已兑现高增长）已部分定价 / 2 级（e-commerce 放量）期权未定 · 优先级 P0 · Top 标的 APP / META
+
+**对应论断**：直接验证论断 3（广告引擎最实）
+
+如果说企业 agent 还在 PPT 与 booking 阶段，广告引擎已经在收入端跑出了第一个产业级 agentic ROI 样本。AppLovin 的 AXON 是一台自有的机器学习引擎，以微秒级速度在海量竞价中匹配广告主需求与发行商供给，广告主设定回报目标，AXON 评估每次曝光对该广告主的价值并出价 [S7]。这套"回报信号反馈闭环"在游戏广告里已被验证，命脉在于它是一个闭环优化的 agent：广告主只需给目标，引擎自主决定分配，这正是 agentic AI 在商业上最干净的落地形态。
+
+AXON 的发展史是一部"从游戏向电商外溢"的扩张史。引擎在移动游戏里成熟后，2026 年向 DTC 商家全面铺开，管理层估计电商 TAM 是核心游戏业务的 5-10 倍 [S7]。当前生命周期处于"核心成熟 + 新 vertical 爆发"的拐点：2026 年 6 月，AppLovin Ads 首次对公众开放自助投放，14 年来广告主第一次无需直客关系即可上平台，这被广泛视为决定性的 binary 事件 [S7]。
+
+谁在玩、谁卡在哪？财务上 AppLovin 极为强劲：Q1 2026 收入 $1.84B（+59% YoY、+11% QoQ），调整后 EBITDA $1.56B（85% 利润率，史上最高季度），FCF $1.29B [S7]；FY2025 收入 +70% 至 $5.48B [S7]。分析师已把 2026 电商收入估算从 $1.05B 上调到 $1.45B [S7]。一个鲜活案例：一家厨具品牌从 $4M 年收入做到 $16M、并预计冲 $80M，大部分广告花在 AppLovin [S7]。卡点有二：其一，公司已不分项披露 vertical 收入（MAX/AXON 统一竞价），故电商收入为分析师估算（C 级）[S7]；其二，SEC 正就其数据收集做问询，叙事从"不可阻挡的 AI 增长"转向"监管风险管理"[S7]。META 则是另一条路径，Advantage+ 把 AI 投放嵌入自有超级分发，是巨头版的 agentic 广告。
+
+⭐ **1 级 vs 2 级估值错配**：APP 当前 PS 26.0、PE 41.5、EV/EBITDA 33.1 [真调]，这是把"已兑现的 85% 利润率 + 59% 增速"给了明确的成长溢价，1 级已部分定价。真正的 2 级期权在 e-commerce 自助放量：6 月 GA 后若放量成功，收入再上一个台阶、估值有望 re-rate；若放量慢于预期（Citi 已提示电商客户 ramp 较慢、维持 $710 目标 [S7]），溢价会回吐。对比 META PS 6.5、PE 20.0、EV/EBITDA 12.8 [真调]，同样是 AI 广告引擎，META 因体量巨大（收入 $215B）+ 成熟，定价远低于 APP，是"已兑现但增速温和"的另一种性价比。错配的关键变量是 APP e-commerce 的放量节奏，这是论断 3 的 falsifier 所在。
+
+护城河与风险。AppLovin 的护城河是数据飞轮（回报信号闭环越用越准）+ 切换成本（广告主依赖其 ROAS）。值得强调的是，AppLovin Ads 被明确设计为可由 AI agent 直接访问，当广告主用 agent 规划投放、生成创意、调配预算时，平台天然对接 agent [S7]，这让它在"agent 驱动广告"的下一阶段占位。风险包括：估值偏高、隐私与平台政策变化、移动游戏集中度、自助放量能否不伤毛利与广告主信任、以及 SEC 问询的监管尾部 [S7]。
+
+| 维度 | 数据 |
+|---|---|
+| APP Q1'26 收入 | $1.84B（+59% YoY）[S7] |
+| 调整后 EBITDA 率 | 85%（史上最高季度）[S7] |
+| FCF | $1.29B/季 [S7] |
+| e-commerce 收入估 | $1.45B（2026E，分析师·C 级）[S7] |
+| 关键 catalyst | 6 月自助投放公众 GA（binary）[S7] |
+
+| 关键玩家 | 国 | 上市 | Ticker | 市值(约) | 估值标注 |
+|---|---|---|---|---|---|
+| AppLovin | 美 | 是 | APP | $160B | PS 26 / EBITDA 85% 已兑现 [真调] |
+| Meta | 美 | 是 | META | $1,397B | PS 6.5 / PE 20 性价比 [真调] |
+
+**推荐动作与入场**。本 link 是 P0、且是全报告唯一"收入端已兑现"的 agentic 样本。产业链逻辑指向：APP 是高 beta 的 e-commerce 放量期权（关注 6 月 GA 后留存与单客 ROAS），META 是低估值的稳态 AI 广告暴露。后续 /deepdive 优先验证 APP e-commerce 的 GA 后留存曲线与 SEC 问询进展。本节不给仓位与目标价。
+
+---
+
+## 6.3 Link 3: 推理基础设施与边缘控制层（NET Cloudflare）🌿
+
+**速览**：产业链第零-一层、agent 的延迟与推理命门 · 估值判断：1 级（高 PS 期权）已定价 / 2 级（agent 工作负载放量）未定 · 优先级 P1 · Top 标的 NET
+
+**对应论断**：直接验证论断 4（命门在推理基础设施）
+
+当所有人盯着 app 层 agent 时，真正的命门正在悄悄上移到推理与边缘控制层。Cloudflare 的 Workers AI 是一个无服务器推理平台，在全球网络的 GPU 上运行模型，且推理与 Workers、存储在同一网络、无跨云跳转的延迟 [S10]。它的命脉在于一个被低估的物理事实：agent 工作流往往串联十次模型调用，单个慢 provider 不是加 50ms 而是加 500ms，而用户对速度的感知系于首 token 时间，边缘邻近性在 agent 时代从"锦上添花"变成"延迟命门"[S10]。
+
+这层的演进史是一部"从模型宿主到推理控制平面"的升级史。Cloudflare 早期只跑轻量开源模型，2026 年已能在 Workers AI 上跑前沿模型（Kimi K2.6，262K 上下文）[S10]，并把自己重新定位为统一推理层，一个 API 访问任意 provider 的任意模型，是 app 与模型之间的控制中间层 [S10]。Agents Week 2026 上它明确提出建"agentic cloud / Cloud 2.0"，并发布推理、搜索、记忆、语音、邮件、浏览器等让 agent 真正干活的原语 [S10]。当前生命周期处于早期成长，基础设施叙事刚起、agent 工作负载放量未至。
+
+谁在玩、谁卡在哪？Cloudflare 用自身用量背书：内部 AI 工程栈跑在自家产品上，AI Gateway 路由 2000 万请求、处理 2410 亿 token、服务 3,683 内部用户 [S10]。经济性上，它打的是利用率痛点，GPU 平均利用率仅 20-40%、三分之一组织 <15%，Workers AI 让客户只为用量付费 [S10]；并用 Unweight 无损压缩实现 22% 模型体积缩减、号称最高 77% 成本节省 [S10]。卡点在于竞争激烈：微软 Entra Internet/Private Access 正逼近 Cloudflare Access 的功能 [S9]，AWS Bedrock/Azure 也在抢推理控制层；同时它的价值主张系于"让推理层变得无聊可靠"，一旦成了"又一个要 debug 的系统"，价值就翻转 [S10]。
+
+⭐ **1 级 vs 2 级估值错配**：NET 当前 PS 36.2、收入仅 $2.33B、尚未盈利（EV/EBITDA 为负）[真调]，这是全报告估值最贵的标的之一，1 级已把"边缘网络 + AI 基础设施期权"充分甚至过度定价。2 级的真期权在于：agent 工作负载若真如其设想放量到"数千万并发会话"[S10]，Workers AI/AI Gateway 的用量计费会被 re-rate；若放量慢、或被超大规模云的推理服务挤压，36x PS 难以维持。这是典型的"高定价期权"，论断 4 的 falsifier（NET PS 压缩到 <15x）正是对这层的反向检验。
+
+护城河与风险。NET 的护城河是 330 城的边缘网络（延迟优势）+ 开发者生态 + 多 provider 中立控制层。但它本身是"金枪鱼里偏贵的一只"，真正的紫苏叶属性体现在它卡住了 agent 的延迟与多模型路由这一咽喉、且用量计费天然契合 agent 经济学。风险：估值过高、超大规模云竞争、bundling 挤压（微软 Entra）、以及"推理层商品化"本身。
+
+| 维度 | 数据 |
+|---|---|
+| NET 收入 | $2.33B / PS 36.2 [真调] |
+| 内部背书 | AI Gateway 2410 亿 token / 3,683 用户 [S10] |
+| 成本优势 | Unweight 22% 体积缩减 / 最高 77% 节省 [S10] |
+| 关键约束 | GPU 利用率均 20-40% [S10] |
+
+| 关键玩家 | 国 | 上市 | Ticker | 市值(约) | 估值标注 |
+|---|---|---|---|---|---|
+| Cloudflare | 美 | 是 | NET | $84B | PS 36.2 高定价期权 🌿 [真调] |
+
+> 🌿 **紫苏叶标注**：NET 的 AI Gateway 是 agent 多模型推理的控制层与延迟命门，agent 工作流的首 token 延迟与跨 provider 路由这一咽喉，目前没有干净的替代，且用量计费契合 agent 经济学。但它市值 $84B、绝非微小，属"偏贵的金枪鱼里带紫苏叶属性"。真正微小、流动性稀薄的纯 agent 基础设施（eval/向量库/agent 身份）多为私有，见附录 D。
+
+**推荐动作与入场**。本 link 是 P1（命门确定但定价已贵）。产业链逻辑指向：NET 是 agent 基础设施的高 beta 期权，估值已 price-in 大量未来，适合作为论断 4 的观察标的而非低位价值标的。/deepdive 优先验证 Workers AI 的 agent 工作负载放量证据（token 处理量、付费客户数）。本节不给仓位与目标价。
+
+---
+
+## 6.4 Link 4: 垂直确定性 Agent 与数据围栏（FICO / GWRE / PEGA / INTU）🌿
+
+**速览**：产业链第四层、专有不可重生成数据护城河 · 估值判断：1 级（数据溢价）已定价 / 2 级（agent 决策放量）待验 · 优先级 P0 · Top 标的 FICO / GWRE / INTU
+
+**对应论断**：直接验证论断 1（数据围栏 = fortress）+ 间接验证论断 4
+
+这层是 SaaSpocalypse 中最被低估的"避风港"。垂直确定性 agent 的命脉在于它们控制着 agent 无法重生成的专有数据与确定性决策，FICO 的信用评分是监管嵌入的 de facto 标准，Guidewire 是 P&C 保险的核心系统，Intuit 每周有 5000 万笔交易流过其 AI [S11]，Pega 的决策引擎把每个决定锚定在业务规则与合规上 [S12]。在一个 AI 概率性输出不被接受的领域（法律、金融、合规），确定性输出 + 专有数据集 + 合规框架就是 2026 年的新护城河 [S17]。
+
+发展史上，这层是"被 agent 强化而非削弱"的典型。FICO 评分诞生于信贷决策，数十年积累成行业标准，agent 再聪明也无法凭空生成一个人的历史信用数据；Guidewire 用十余年把保险核心系统做成行业基础设施，AI 更可能加速迁移到它而非取代它（类比 Procore 按施工量收费、成为行业数字基底 [S5]）。当前生命周期：FICO/GWRE 处于成熟稳态 + agent 决策放量早期，Intuit 正从订阅转向用量计费（8 月上线 QuickBooks 用量定价 [S11]）。
+
+谁在玩、谁卡在哪？Pega 在 Q1 2026 Pega Cloud ACV +29% YoY、总 ACV +12% 至 $1,622M、FCF >$200M，Blueprint AI 驱动管道增长 [S12]，并被点名为并购标的（市值约 $6.3B，适合 Salesforce/ServiceNow/IBM/Oracle 或 PE rollup）[S12]。Intuit CEO 称 AI agent "已在规模上交付价值"，但市场反应剧烈，Intuit 因 CEO 称 AI 正快速驱动变化而一度跌 20% [S11]。卡点在于：这层的 agent 决策放量还需验证（确定性 agent 的实际渗透），且转用量定价短期会带来收入波动。
+
+⭐ **1 级 vs 2 级估值错配**：这是本 link 的核心。FICO 当前 PS 12.2、PE 37.5 [真调]，市场已给信用评分的标准地位明确溢价，1 级充分定价。但 GWRE PS 7.1、INTU PE 16.3、PEGA PE 16.6 [真调] 则呈现错配：GWRE 拥有保险核心数据却 PS 仅 7.1，INTU 拥有 5000 万笔/周的财务数据图谱却 PE 仅 16.3、还因 AI 叙事被错杀 20% [S11]。市场在 SaaSpocalypse 中把这些"专有数据围栏"与薄工具一齐打折，恰恰错配了，它们是论断 1 里最不该被压的"fortress"。2 级期权在于 agent 决策（FICO 的 AI 决策、Pega Blueprint）放量后的 ARPU 扩张。
+
+护城河与风险。护城河是不可重生成的专有数据 + 监管/合规嵌入 + 确定性输出需求，这是 agent 时代最硬的一类 [S17]。风险：第一，INTU/Pega 转用量定价的收入波动与执行风险；第二，监管变化（信用评分政策、保险监管）；第三，被巨头 bundling 或并购（Pega 已是标的）。综合看，这是"被错杀的数据围栏"，是分叉论断里确定性最高的受益层。
+
+| 维度 | 数据 |
+|---|---|
+| FICO 估值 | PS 12.2 / PE 37.5（评分标准溢价）[真调] |
+| GWRE 估值 | PS 7.1（保险核心、被低估）[真调] |
+| INTU 数据 | 50M tx/周过 AI，8 月用量定价 [S11] |
+| PEGA ACV | Pega Cloud +29% YoY，并购标的 [S12] |
+
+| 关键玩家 | 国 | 上市 | Ticker | 市值(约) | 估值标注 |
+|---|---|---|---|---|---|
+| Fair Isaac | 美 | 是 | FICO | $27B | PS 12.2 评分 de facto 标准 🌿 [真调] |
+| Guidewire | 美 | 是 | GWRE | $10B | PS 7.1 保险核心数据 🌿 [真调] |
+| Intuit | 美 | 是 | INTU | $73B | PE 16.3 财务数据图谱被错杀 [真调] |
+| Pegasystems | 美 | 是 | PEGA | $5B | PE 16.6 并购标的 [真调] |
+
+> 🌿 **紫苏叶标注**：FICO（信用评分）与 GWRE（保险核心系统）是本 link 真正的紫苏叶，它们垄断的不是"功能"而是"监管嵌入的确定性数据标准"，agent 无法重生成历史信用数据或保险核心账本。红队：若被替代，需要监管层重新认可一套新的评分/核心标准 + 数十年数据积累，短期不可能。
+
+**推荐动作与入场**。本 link 是 P0、且是分叉论断里确定性最高的"被错杀数据围栏"。产业链逻辑指向：GWRE、INTU、PEGA 是"专有数据 × 低估"的错配组合，FICO 是已充分定价的标准溢价标的。/deepdive 优先 GWRE（保险核心数据 vs PS 7.1）与 INTU（财务数据图谱 vs PE 16.3 + 用量定价拐点）。本节不给仓位与目标价。
+
+---
+
+## 6.5 Link 5: CX / 联络中心 Agent（NICE / TWLO）
+
+**速览**：产业链第四层、结果定价最先落地的前沿 · 估值判断：1 级（NICE 低估）错配明显 / 2 级（agent 替代席位）双刃 · 优先级 P1 · Top 标的 NICE
+
+**对应论断**：间接验证论断 1 + 间接验证论断 4（结果定价兑现）
+
+事实上，联络中心是 agent 替代人力最直接、结果最易衡量的战场，也是 outcome-based 定价最先落地的品类。命脉在于：客服工单的"解决"是一个可清晰计量的结果，故 Intercom Fin 凭 $0.99/解决工单从 $1M 做到 $100M+ ARR、处理 Intercom 80%+ 客服量、每周关闭约百万次对话 [S20]；Zendesk 按 $1.50/承诺自动解决收费 [S20]。这层既是 agent ROI 的样本，也是席位压缩最锋利的刀口。
+
+谁在玩、谁卡在哪？NICE 是 CX AI 龙头：FY2025 收入 $2,945M（+8% YoY），云 +13%，AI 与自助 ARR 达 $328M（+66% YoY），FCF $623M [S14]；Q1 2026 收入 $768.6M（+9.8% YoY），backlog +25% YoY [S14]。它 2025 年以 $955M 收购 Cognigy，把对话 AI 升级为 agentic CX 平台，2026 年 3 月推出"把企业交互数据直接转成可部署 agent"的创新、几小时内从识别到上线 [S14]。NICE 2026 云收入指引 14.5-15%（较 2025 的 13% 加速）[S14]。Twilio 是 CPaaS（通信 API）+ AI，命脉在于它是 agent 与人通信的管道。卡点在于：CX 是双刃，agent 替代人工座席既创造 NICE 的新 ARR，也压缩了按席位计费的旧收入。
+
+⭐ **1 级 vs 2 级估值错配**：NICE 当前 PS 1.8、PE 10.9、EV/EBITDA 6.1、FCF yield 9.0% [真调]，这是全报告最便宜的标的之一，被 Motley Fool 直接称为"难得的便宜货"[S14]。市场把它当成"被 agent 颠覆的旧 CX 厂商"打折，却忽视它本身是 agentic CX 的领先供应商（AI ARR +66%、backlog +25%）。这是论断 1 里"被错杀的潜在 fortress"的鲜明案例：1 级（当期低估值）与 2 级（agent ARR 高增）严重错配。TWLO PS 5.5、PE 294.7（盈利刚转正、PE 失真）[真调] 则是另一种状态，估值已反映 AI 通信期权，但盈利质量待观察。
+
+护城河与风险。NICE 护城河是 CX 数据 + 企业部署的合规性 + Cognigy 的 agentic 能力。风险：CX 席位压缩的双刃效应、云迁移执行、以及通用 LLM 直接做客服 agent 的商品化威胁。
+
+| 维度 | 数据 |
+|---|---|
+| NICE AI ARR | $328M（+66% YoY）[S14] |
+| NICE 估值 | PS 1.8 / PE 10.9（最便宜之一）[真调] |
+| Cognigy 收购 | $955M（2025）[S14] |
+| 结果定价样本 | Intercom Fin $0.99/工单 $100M+ ARR [S20] |
+
+| 关键玩家 | 国 | 上市 | Ticker | 市值(约) | 估值标注 |
+|---|---|---|---|---|---|
+| NICE | 以 | 是(ADR) | NICE | $5B | PS 1.8 / PE 10.9 被错杀 [真调] |
+| Twilio | 美 | 是 | TWLO | $29B | PS 5.5 / PE 294.7 失真 [真调] |
+
+**推荐动作与入场**。本 link 是 P1，NICE 是"低估值 × agent ARR 高增"的强错配候选。/deepdive 优先验证 NICE 的 CX 席位压缩对总收入的净效应（新 AI ARR 能否盖过旧席位流失）。本节不给仓位与目标价。
+
+---
+
+## 6.6 Link 6: 自动化 / RPA 向 Agentic 转型（PATH / PEGA）
+
+**速览**：产业链第四层、agent 的"执行身体" · 估值判断：1 级（转型折价）已定价 / 2 级（agentic 放量）待验 · 优先级 P1 · Top 标的 PATH
+
+**对应论断**：间接验证论断 4（agent 需要 RPA 作执行体）
+
+需要强调的是，RPA 一度被认为会被 LLM 淘汰，2026 年的结论恰相反，它正成为 agent 的"执行身体"。命脉在于一个技术事实：agent 负责思考（解读、推理、规划），但不直接操作企业系统，而是把 RPA 工作流、API、函数当工具来调用，"agent 思考、机器人执行"，这种解耦让 agentic 自动化变得安全可行 [S18]。UiPath 在 2025 年系统性证明了 LLM 不会让 RPA 过时，反而 agent 需要一个自动化的"身体"去真正操作遗留系统 [S18]。
+
+谁在玩、谁卡在哪？UiPath 的 ARR 在 2026 年初达 $1.85B，商业模式从按"机器人"计费进化到用量/按 agent 计费 [S18]；2026 年 2 月收购 WorkFusion，从横向自动化进入合规预建工作流，并聚焦欺诈检测作为切入大型金融机构的高价值入口 [S18]。卡点在于：微软 Power Automate 直接竞争 RPA、Copilot Studio 与 UiPath 的 agent 构建重叠，微软靠成本、默认分发与原生契合竞争，UiPath 强在复杂企业编排与遗留系统执行 [S18]；同时 UiPath 面临把 agentic AI 整合进 20 年 RPA 代码库的技术债风险 [S18]。Pega 的 BPM 引擎也提供类似"确定性 harness"，与本 link 重叠。
+
+⭐ **1 级 vs 2 级估值错配**：PATH 当前 PS 3.3、PE 17.6、FCF yield 9.4%、现金 $1.31B（占 EV $4.23B 的 31%）[真调]，这是"转型期折价 + 厚现金"的组合。市场把它当成"被 agent 威胁的旧 RPA"打折，但它实际是 agent 执行层的卡位者（ARR $1.85B、转用量定价）。1 级（转型折价 PS 3.3）与 2 级（agentic 编排放量）的错配，取决于它能否在微软挤压下守住复杂企业编排的领地。这是期权型错配，beta 较高。
+
+护城河与风险。护城河是复杂企业编排 + 遗留系统执行 + 欺诈/合规垂直深耕。风险：微软 bundling 挤压、技术债、agentic 转型执行、以及"屏幕读取 AI 缩小 RPA 护城河"的微软纳入风险 [S18]。
+
+| 维度 | 数据 |
+|---|---|
+| UiPath ARR | $1.85B（2026 初）[S18] |
+| 定价进化 | 按机器人 → 用量/按 agent [S18] |
+| PATH 估值 | PS 3.3 / 现金占 EV 31% [真调] |
+| 关键收购 | WorkFusion（合规，2026-02）[S18] |
+
+| 关键玩家 | 国 | 上市 | Ticker | 市值(约) | 估值标注 |
+|---|---|---|---|---|---|
+| UiPath | 美 | 是 | PATH | $5.5B | PS 3.3 转型期权 + 厚现金 [真调] |
+| Pegasystems | 美 | 是 | PEGA | $5B | BPM harness（与 Link 4 重叠）[真调] |
+
+**推荐动作与入场**。本 link 是 P1 期权。PATH 是"RPA→agentic 转型 + 厚现金缓冲"的 beta 标的，核心风险是微软挤压。/deepdive 验证 UiPath 用量/按 agent 定价的实际渗透与净留存。本节不给仓位与目标价。
+
+---
+
+## 6.7 Link 7: 创意 / 设计 / 消费 AI（ADBE / DUOL / U / ADSK）
+
+**速览**：产业链第四层、razor-blade 信用点货币化 · 估值判断：1 级（ADBE 被错杀）错配 / 2 级（AI 替代创意）双刃 · 优先级 P1 · Top 标的 ADBE / DUOL
+
+**对应论断**：间接验证论断 1（ADBE 数据/工作流 vs 通用模型威胁）
+
+另一方面，创意与消费 AI 是 agent 双刃效应最直接的品类，AI 既是它们的新货币化引擎，也是它们最大的商品化威胁。命脉在于工作流嵌入 + 信用点货币化：Adobe 用"razor-blade"信用点模式（$19.99/4000 信用点，多数生成 1 信用点/次）把高推理成本货币化、同时维持高毛利订阅 [S11]。Duolingo 则把 AI 做成 Max 高级层（Video Call/Roleplay 等），AI 层占付费基础约 9%（上年 5%）[S16]。
+
+谁在玩、谁卡在哪？Adobe 在 SaaSpocalypse 中跌 30-45%，创意套件面临生成视频/设计平台的压力 [S8][S17]，但它仍握有创意工作流的事实标准 + Firefly 商业安全模型。Duolingo 2025 年底 DAU 52.7M、付费 12.2M，Q1 2026 DAU 56.5M（+21% YoY），目标 2028 年 100M DAU [S16]；2026 年是"投资年"，指引收入 +15-18%、EBITDA 利润率压到 ~25%（AI 推理成本）[S16]。卡点在于：通用 LLM（ChatGPT/Gemini/Claude）能以同等甚至更低成本做语言导师，Duolingo 的规模与游戏化是不是真护城河存疑 [S16]；ADBE 同理面临"为什么不用通用生成模型"的拷问。
+
+⭐ **1 级 vs 2 级估值错配**：ADBE 当前 PE 11.6、EV/EBITDA 8.4、FCF yield 11.4% [真调]，这是把创意软件龙头打到了深度价值区间，反映市场对"被生成 AI 颠覆"的极度悲观。1 级（PE 11.6）与 2 级（Firefly 信用点货币化 + 工作流嵌入）严重错配：若 Firefly 货币化兑现 + 工作流粘性守住，估值有修复空间；若被商品化，便是价值陷阱。DUOL PE 13.9、PS 5.2 [真调] 处于"投资年压利润 + 高 DAU 增长"的过渡定价。U（Unity）PS 6.4、亏损（PE 175.8 失真）[真调] 是游戏引擎 AI 期权、beta 最高。
+
+护城河与风险。ADBE 护城河是创意工作流标准 + 商业安全 AI + 企业渗透；DUOL 是游戏化 + 口碑获客（低 CAC，营业利润率 7%→15% [S16]）。风险：通用模型商品化、AI 推理成本压毛利、消费者为什么付溢价的拷问。
+
+| 维度 | 数据 |
+|---|---|
+| ADBE 估值 | PE 11.6 / FCF yield 11.4%（深度价值）[真调] |
+| DUOL DAU | 56.5M（+21% YoY），目标 100M（2028）[S16] |
+| DUOL Max 占比 | 付费基础 ~9%（上年 5%）[S16] |
+| 货币化模式 | Adobe 信用点 razor-blade [S11] |
+
+| 关键玩家 | 国 | 上市 | Ticker | 市值(约) | 估值标注 |
+|---|---|---|---|---|---|
+| Adobe | 美 | 是 | ADBE | $81B | PE 11.6 被错杀深度价值 [真调] |
+| Duolingo | 美 | 是 | DUOL | $5.7B | PE 13.9 投资年过渡 [真调] |
+| Unity | 美 | 是 | U | $12B | PS 6.4 游戏引擎 AI 期权 [真调] |
+| Autodesk | 美 | 是 | ADSK | $41B | PE 28.7 设计软件 [真调] |
+
+**推荐动作与入场**。本 link 是 P1，ADBE 是"被错杀的创意龙头 vs 商品化威胁"的高争议错配。/deepdive 优先 ADBE（Firefly 货币化兑现度 vs PE 11.6）的多空验证。本节不给仓位与目标价。
+
+---
+
+## 6.8 Link 8: 协作 / 参与薄工作流（at-risk 组：ASAN / MNDY / DOCU / ZM / GTLB / BILL / HUBS / C3.ai）
+
+**速览**：产业链第五层、被两端挤压的中间层 · 估值判断：1 级（已大幅折价）/ 2 级（转型成败决定生死）· 优先级 P2（风险监控）· Top 标的 监控为主
+
+**对应论断**：直接验证论断 1（薄工具席位压缩）+ 间接验证论断 4（被 bundling 挤压）
+
+数据显示，这是 SaaSpocalypse 的震中。协作薄工作流的结构性弱点在于：如果一个 SaaS 产品本质是"带几个按钮的界面"、主要工作是让人在系统间搬运数据，它就正处在 AI 替代的爆炸半径内 [S6]。命脉问题是它们既不掌握分发，也没有 agent 无法重生成的专有数据，正是论断 1 与 4 里被两端挤压的"中间层"。标志性事件：Atlassian 报告了史上第一次企业席位下降、股价跌 35% [S8]。
+
+谁在玩、谁卡在哪？monday.com 在 Q1 2026 收入 $351.3M（+24% YoY），推出 AI Work Platform + 原生 agent + "席位 + 信用点"定价，主动转出纯席位制 [S15]；但 FY 指引降速到 +19-20%（2025 还是 27%）[S15]。Asana 用 per-agent 部署 + 执行量的混合模型 [S15]。这层的共同卡点：转用量/结果定价的执行风险（打包、权益、销售提成、预测全是按席位建的），转型本身带来收入波动、降低锁定、压缩定价权与 NRR [S15]。C3.ai 是这层里最待证的一个，FQ3 2026 收入仅 $53.3M、GAAP 毛利率 17%、持续亏损（每股 -$0.94），靠联邦订单（+134% YoY）撑增长、现金 $621.9M [S13]，是高风险的纯故事股。
+
+⭐ **1 级 vs 2 级估值错配**：这层的 1 级已大幅折价，ASAN PS 2.0（亏损）、MNDY PS 2.9、DOCU PS 2.6、BILL PS 2.2 [真调]，市场已把"席位压缩"price-in 到接近末日。错配方向与前几个 link 相反：这里的风险是 1 级折价可能还不够（若席位转负扩散、转型失败，估值仍有下行），而非被错杀。判别标准是论断 1 的 falsifier：若某家 NRR 维持 >105%、成功转出席位制（如 MNDY 的席位+信用点若放量），则被错杀；若 NRR 跌破 100%、席位转负，则折价合理甚至不足。这是"价值陷阱 vs 困境反转"的分水岭，需逐个标的验证、不可一概而论。
+
+护城河与风险。这层多数护城河薄弱（低切换成本、无专有数据），少数有局部粘性（DOCU 的电子签名网络效应、HUBS 的中小企业 CRM 生态、BILL 的支付流）。风险：席位压缩、微软 E7 bundling 挤压（Teams/Loop 替代协作工具）[S9]、转型执行、以及被并购或退市。
+
+| 维度 | 数据 |
+|---|---|
+| 标志事件 | Atlassian 首现席位下降、-35% [S8] |
+| MNDY 转型 | AI Work Platform 席位+信用点，指引降速 27%→20% [S15] |
+| C3.ai 状态 | 收入 $53.3M、GAAP 毛利 17%、持续亏损 [S13] |
+| 估值区间 | PS 2.0-2.9（ASAN/MNDY/DOCU/BILL）[真调] |
+
+| 关键玩家 | 国 | 上市 | Ticker | 市值(约) | 估值标注 |
+|---|---|---|---|---|---|
+| monday.com | 以 | 是 | MNDY | $3.8B | PS 2.9 转型中、指引降速 [真调] |
+| Asana | 美 | 是 | ASAN | $1.7B | PS 2.0 亏损、at-risk [真调] |
+| DocuSign | 美 | 是 | DOCU | $8.6B | PS 2.6 电签网络效应 [真调] |
+| Zoom | 美 | 是 | ZM | $25B | PS 5.1 / 现金占 EV 44% [真调] |
+| GitLab | 美 | 是 | GTLB | $4.9B | PS 4.9 亏损、Duo AI [真调] |
+| HubSpot | 美 | 是 | HUBS | $9.5B | PS 2.9 / PE 98 中小企业生态 [真调] |
+| BILL Holdings | 美 | 是 | BILL | $3.5B | PS 2.2 支付流 [真调] |
+| C3.ai | 美 | 是 | AI | $1.4B | 持续亏损纯故事股 [S13] |
+
+**推荐动作与入场**。本 link 是 P2（风险监控为主，不是低位价值机会）。产业链逻辑指向：这层需逐个区分"困境反转候选（成功转出席位制、有局部粘性，如 MNDY/DOCU/ZM 厚现金）"与"价值陷阱（无护城河 + 转型失败，如 C3.ai）"。ZM 现金占 EV 44%（$7.72B 现金 / $17.7B EV）[真调] 提供了下行缓冲。/deepdive 仅在出现明确困境反转信号（NRR 企稳 + 用量定价放量）时才上调优先级。本节不给仓位与目标价。
+
+---
+
+# 七、地缘与政策约束
+
+*这一节讲产业的国别集中度 + 地缘/监管风险 + 政策窗口。*
+
+AI 应用与 Agent 产业的地缘格局高度简单又高度集中：这是一个美国近乎垄断的产业。26 只标的池中，除 SAP（德国）、NICE 与 monday.com（以色列）外，全部为美国上市公司 [真调]。基础模型（OpenAI/Anthropic/Google）、分发渠道（微软/CRM/NOW）、广告引擎（APP/META）、推理基础设施（NET）全部在美国手里。这与硬件产业链"美日韩欧分极"的格局截然不同，软件 agent 的"卡脖子"不在跨国材料分布，而在分发与数据围栏，而这两者都集中在美国超大规模平台手里。因此本产业的地缘 materiality 主要体现在**监管 + 平台政策**而非国别供应链。
+
+国别矩阵分三视图呈现：(a) ASCII 世界分布图按国家组团勾勒格局；(b) markdown 矩阵给每国代表玩家；(c) 海外节点延伸表给少数非美前哨。需说明的是，由于本产业美国集中度极高，三视图主要用于呈现"美国一极 + 欧以少数前哨"的结构，而非多国寡占。
+
+## 7.1 ASCII 世界分布图
+
+<!--VIZ:geo-->
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│            🌍 AI 应用与 Agent 产业 国别 × link 世界分布速览（2026Q2）               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+  美国 — 全栈垄断（基础模型/分发/记录系统/广告/推理）
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │ 记录系统: CRM/NOW/WDAY/INTU | 分发: MSFT | 广告: APP/META             │
+  │ 推理: NET | 垂直: FICO/GWRE/PEGA/ADBE/PATH | 薄工具: ASAN/MNDY/DOCU/ZM │
+  └──────────────────────────────────────────────────────────────────────┘
+
+  德国/欧洲 — ERP 记录系统前哨
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │ SAP（ERP 龙头、Joule + API policy 数据围栏、AI 消费定价）             │
+  └──────────────────────────────────────────────────────────────────────┘
+
+  以色列 — CX + 协作前哨
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │ NICE（CX AI 龙头 + Cognigy）| monday.com（协作、转席位+信用点）        │
+  └──────────────────────────────────────────────────────────────────────┘
+```
+
+## 7.2 完整国别 × link 精对齐矩阵
+
+| 链节 \ 国别 | 美国 US | 德国 DE | 以色列 IL | 备注 |
+|---|---|---|---|---|
+| 分发+数据围栏 | MSFT/CRM/NOW（主导）| SAP（API policy）| — | 美国主导、SAP 欧洲围栏 [S9][S19] |
+| 记录系统 | CRM/NOW/WDAY/INTU | SAP | — | 全球 ERP/CRM 寡头 [真调] |
+| 广告引擎 | APP/META（垄断）| — | — | 美国独占 [S7] |
+| 推理基础设施 | NET（边缘控制层）| — | — | 美国独占 [S10] |
+| 垂直确定性 | FICO/GWRE/PEGA/ADBE | — | — | 美国数据围栏 [真调] |
+| CX agent | TWLO | — | NICE（龙头）| 以色列前哨 [S14] |
+| 协作薄工具 | ASAN/DOCU/ZM/GTLB | — | monday.com | at-risk 组 [S15] |
+
+## 7.3 海外节点延伸表（非美前哨 / ≥5 行）
+
+| 国家 | 关键节点 | 代表玩家 | 战略意义 |
+|---|---|---|---|
+| 德国 | ERP 记录系统 + 数据围栏 | SAP | 欧洲企业数据主权、API policy 引发 DSAG 反弹 [S19] |
+| 以色列 | CX AI + Cognigy | NICE | 全球 CX agent 龙头、$955M 收购整合 [S14] |
+| 以色列 | 协作平台转型 | monday.com | 席位+信用点定价转型样本 [S15] |
+| 全球 | 边缘推理网络 | NET（330 城）| agent 延迟命门的物理分布 [S10] |
+| 欧盟 | AI 监管（AI Act）| 全行业 | agent 合规/数据主权约束 |
+
+矩阵之外还有几个关键监管节点不能忽视。最重要的不是国别，而是平台政策：ServiceNow 的 Action Fabric 与 SAP 禁止未授权 AI 调用 API 的政策，本质是记录系统在为"谁能让外部 agent 访问企业数据"立法 [S19]。SAP CEO Klein 强调客户不会为访问自己的数据付费、架构保持开放，但 DSAG 用户组与生态（已为微软 Copilot/Salesforce Einstein 建连接器的厂商）仍强烈反弹 [S19]。这场"数据围栏 vs 开放生态"的拉锯，是 agent 时代最关键的政策变量。
+
+| Link | top 国占比 | 风险等级 | 卡在哪 |
+|---|---|---|---|
+| 分发+数据围栏 | 美 ~90% | 高（监管/反垄断）| 微软 bundling 反垄断审视 |
+| 广告引擎 | 美 100% | 中（SEC 问询 APP）| 数据收集合规 [S7] |
+| 记录系统 | 美 ~80% | 中（数据主权）| 欧盟数据本地化 |
+
+最后是 stress-test 情景：
+
+| 情景 | 影响最大的 link | 影响幅度 | 概率（3yr）|
+|---|---|---|---|
+| 微软反垄断限制 bundling | 分发（利好独立 SaaS）| 中 | 中 |
+| 欧盟 AI Act 严格执行 | 全行业合规成本 | 中 | 高 |
+| SEC 对 APP 不利裁定 | 广告引擎 | 高（单标的）| 中 |
+| 数据围栏被监管否决 | 记录系统议价权 | 中 | 低 |
+
+本产业地缘风险的本质是"美国平台集中度 + 监管尾部"。最大的政策不确定性来自三处：微软 bundling 的反垄断审视、欧盟 AI Act 对 agent 的合规约束、以及数据围栏（Action Fabric/SAP policy）能否经得起用户与监管的双重压力。对配置者而言，地缘不是本产业的主要风险来源，监管与平台政策才是。
+
+---
+
+# 八、标的图谱与估值数据
+
+*这一节是标的图谱，产业链分析落到 ticker 的完整清单 + 准确数据。仓位/对冲/目标价是下游组合环节的事，本节只负责"找全、数据准、标注清"。*
+
+基于前面六章的产业链分析，本研究把 26 只标的池按链层组织如下。标注用语限于产业链位置与估值错配信号，不含买卖与评级语言。
+
+| 链层 | 标的 | Ticker | 国 | 与论断的关联 | 定性标注 |
+|---|---|---|---|---|---|
+| 推理基础设施 | Cloudflare | NET | 美 | 论断 4（命门）| 🌿 高定价期权 PS 36 |
+| 分发+记录系统 | Salesforce | CRM | 美 | 论断 1+2（fortress）| 被错杀 PE 18.4 |
+| 记录系统 | ServiceNow | NOW | 美 | 论断 1+2 | agent 兑现龙头 PE 58.5 |
+| 记录系统 | SAP | SAP | 德 | 论断 1 | ERP 围栏 PE 21.9 |
+| 记录系统 | Workday | WDAY | 美 | 论断 1 | HR/财务 PE 38.8 |
+| 记录系统 | Intuit | INTU | 美 | 论断 1（数据图谱）| 被错杀 PE 16.3 🌿数据 |
+| 广告引擎 | AppLovin | APP | 美 | 论断 3（已兑现）| 命门 EBITDA 85% |
+| 广告引擎 | Meta | META | 美 | 论断 3 | 性价比 PE 20 |
+| 垂直确定性 | Fair Isaac | FICO | 美 | 论断 1+4 | 🌿评分标准 PS 12.2 |
+| 垂直确定性 | Guidewire | GWRE | 美 | 论断 1 | 🌿保险核心 被低估 PS 7.1 |
+| 垂直确定性 | Pegasystems | PEGA | 美 | 论断 1 | BPM 并购标的 PE 16.6 |
+| CX agent | NICE | NICE | 以 | 论断 1 | 被错杀 PE 10.9 |
+| CX agent | Twilio | TWLO | 美 | 论断 4 | CPaaS PE 失真 |
+| 自动化 | UiPath | PATH | 美 | 论断 4 | 转型期权 + 厚现金 |
+| 创意/消费 | Adobe | ADBE | 美 | 论断 1 | 被错杀深度价值 PE 11.6 |
+| 创意/消费 | Duolingo | DUOL | 美 | 论断 1 | 投资年过渡 PE 13.9 |
+| 创意/消费 | Unity | U | 美 | 论断 1 | 游戏引擎期权 亏损 |
+| 创意/设计 | Autodesk | ADSK | 美 | 论断 1 | 设计软件 PE 28.7 |
+| 薄工作流 | monday.com | MNDY | 以 | 论断 1（at-risk）| 转型中 PS 2.9 |
+| 薄工作流 | Asana | ASAN | 美 | 论断 1（at-risk）| 亏损 PS 2.0 |
+| 薄工作流 | DocuSign | DOCU | 美 | 论断 1 | 电签网络 PS 2.6 |
+| 薄工作流 | Zoom | ZM | 美 | 论断 1 | 厚现金 PS 5.1 |
+| 薄工作流 | GitLab | GTLB | 美 | 论断 1 | Duo AI 亏损 PS 4.9 |
+| 薄工作流 | HubSpot | HUBS | 美 | 论断 1 | 中小企业生态 PE 98 |
+| 薄工作流 | BILL | BILL | 美 | 论断 1 | 支付流 PS 2.2 |
+| 待证 | C3.ai | AI | 美 | 论断 1（高风险）| 持续亏损故事股 |
+
+## 8.1 定量估值速查表（V2.4 · 全部真调 yfinance）
+
+下表把组合内全部 26 只标的的估值锚定到可比指标，数据真调 yfinance（截至 2026-06，收入为 TTM 口径）。本表不含评级与目标价。盈利标的报 PE/EV-EBITDA，亏损/现金消耗型才看现金跑道。
+
+| Ticker | 真调价 | 市值(约$B) | EV($B) | 现金($B) | 收入 TTM($B)/PS | PE | EV/EBITDA | FCF% | 量(agent 指标) | 标注 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| NET | 237.24 | 84.2 | 83.6 | 4.16 | 2.33 / 36.2 | 亏损 | 负 | 0.9 | AI Gateway 241B token [S10] | 🌿高定价期权 ◆美 |
+| CRM | 158.37 | 129.7 | 160.4 | 11.84 | 42.83 / 3.0 | 18.4 | 12.4 | 12.8 | Agentforce ARR $1B+ [S4] | 被错杀 fortress ◆美 |
+| NOW | 98.34 | 101.4 | 98.7 | 5.18 | 13.96 / 7.3 | 58.5 | 34.2 | 5.0 | Now Assist ACV $600M+(2025·目标$1B) [S5] | agent 龙头高溢价 ◆美 |
+| SAP | 155.09 | 182.8 | 180.7 | 10.04 | 37.34 / 4.9 | 21.9 | 15.6 | 4.5 | Joule + API 围栏 [S19] | ERP 围栏 ●德 |
+| WDAY | 124.21 | 30.7 | 30.1 | 4.35 | 9.85 / 3.1 | 38.8 | 19.9 | 10.2 | HR/财务 agent | 记录系统 ◆美 |
+| INTU | 267.72 | 73.2 | 73.4 | 6.78 | 20.92 / 3.5 | 16.3 | 11.4 | 7.1 | 50M tx/周 [S11] | 🌿数据图谱被错杀 ◆美 |
+| APP | 477.08 | 160.3 | 161.4 | 2.76 | 6.16 / 26.0 | 41.5 | 33.1 | 2.0 | AXON +59% YoY [S7] | 已兑现命门 ◆美 |
+| META | 550.25 | 1396.8 | 1402.4 | 81.18 | 214.96 / 6.5 | 20.0 | 12.8 | 1.8 | Advantage+ | 性价比 ◆美 |
+| FICO | 1182.79 | 27.4 | 30.9 | 0.22 | 2.26 / 12.2 | 37.5 | 26.5 | 2.7 | 评分 de facto 标准 | 🌿已定价标准溢价 ◆美 |
+| GWRE | 121.48 | 10.1 | 10.1 | 0.75 | 1.42 / 7.1 | 65.3 | 76.9 | 2.8 | 保险核心数据 | 🌿被低估数据围栏 ◆美 |
+| PEGA | 30.78 | 5.1 | 4.7 | 0.47 | 1.70 / 3.0 | 16.6 | 22.8 | 10.4 | Pega Cloud ACV +29% [S12] | 并购标的 ◆美 |
+| NICE | 91.99 | 5.4 | 5.2 | 0.30 | 3.01 / 1.8 | 10.9 | 6.1 | 9.0 | AI ARR $328M +66% [S14] | 被错杀最便宜 ●以 |
+| TWLO | 191.57 | 29.1 | 27.8 | 2.35 | 5.30 / 5.5 | 294.7 | 63.2 | 3.0 | CPaaS + AI | PE 失真 ◆美 |
+| PATH | 10.53 | 5.5 | 4.2 | 1.31 | 1.67 / 3.3 | 17.6 | 34.2 | 9.4 | ARR $1.85B [S18] | 转型期权+厚现金 ◆美 |
+| ADBE | 202.73 | 80.6 | 82.0 | 5.63 | 25.20 / 3.2 | 11.6 | 8.4 | 11.4 | Firefly 信用点 [S11] | 被错杀深度价值 ◆美 |
+| DUOL | 121.49 | 5.7 | 4.5 | 1.25 | 1.10 / 5.2 | 13.9 | 25.4 | 5.5 | DAU 56.5M +21% [S16] | 投资年过渡 ◆美 |
+| U | 28.23 | 12.3 | 12.5 | 2.14 | 1.92 / 6.4 | 亏损 | 175.8 | 4.9 | 游戏引擎 AI | 期权 ◆美 |
+| ADSK | 196.26 | 41.4 | 41.2 | 2.92 | 7.51 / 5.5 | 28.7 | 19.3 | 7.4 | 设计 AI | 记录系统类 ◆美 |
+| MNDY | 73.02 | 3.8 | 2.7 | 1.21 | 1.30 / 2.9 | 31.9 | 145.4 | 6.6 | 席位+信用点 [S15] | 转型中 at-risk ●以 |
+| ASAN | 6.97 | 1.7 | 1.5 | 0.42 | 0.81 / 2.0 | 亏损 | 负 | 11.4 | per-agent 混合 [S15] | at-risk ◆美 |
+| DOCU | 45.21 | 8.6 | 8.0 | 0.81 | 3.29 / 2.6 | 29.4 | 20.7 | 14.5 | 电签 + AI | 网络效应 ◆美 |
+| ZM | 86.48 | 25.4 | 17.7 | 7.72 | 4.93 / 5.1 | 12.7 | 13.2 | 7.8 | 现金占 EV 44% | 厚现金缓冲 ◆美 |
+| GTLB | 29.07 | 4.9 | 3.5 | 1.36 | 1.00 / 4.9 | 亏损 | 负 | 6.4 | Duo AI | at-risk 亏损 ◆美 |
+| HUBS | 185.47 | 9.5 | 8.1 | 1.69 | 3.30 / 2.9 | 98.1 | 91.5 | 6.9 | 中小企业 CRM | 生态粘性 ◆美 |
+| BILL | 35.52 | 3.5 | 3.3 | 2.17 | 1.60 / 2.2 | 亏损 | 97.2 | 4.7 | 支付流 | at-risk ◆美 |
+| AI | 8.90 | 1.4 | 0.9 | 0.58 | 0.25 / 5.5 | 亏损 | 负 | -1.9 | 联邦 +134% [S13] | 故事股·跑道 ~30 月 ◆美 |
+
+（量列为各标的最新期 agent 相关指标，口径不一已分别标注；行业无统一物理量，故份额% 不强制计算、以 agent ARR/ACV 增速作份额代理。份额↑而估值未动者 = 最强 alpha 信号，本表中 NICE/GWRE/INTU/ADBE 符合"AI ARR 高增 × 估值被错杀"特征。）
+
+数字化解读：本表把"估值错配"从形容词变成数字，几个信号清晰可见。第一，被错杀的 fortress，CRM（PE 18.4）、SAP（21.9）、INTU（16.3）、ADBE（11.6）、NICE（10.9）都被定价到接近或低于市场平均，但它们或有专有数据围栏、或有 agent ARR 高增，是分叉论断里"两端"被错杀的核心。第二，高定价期权，NET（PS 36）、APP（PS 26）、NOW（PE 58.5）已 price-in 大量未来，是 beta 而非价值。第三，亏损/现金消耗型，C3.ai（亏损、FCF -1.9%、现金 $0.58B / 季度净亏约 $0.06B，跑道约 30 月）、ASAN/GTLB/BILL 是 at-risk 组里需结合跑道判断的标的；ZM 现金占 EV 44%（$7.72B/$17.7B）提供下行缓冲。第四，份额-估值错配，NICE（AI ARR +66% × PS 1.8）、GWRE（保险核心 × PS 7.1）是"高增长 × 低估值"的最强 alpha 候选。解读限于数据与错配信号本身，不给买卖动作。
+
+**核心标的 1 深度论述（GWRE）**。Guidewire 是分叉论断里最被低估的"专有数据围栏"。它在 P&C 保险核心系统的地位类似 Procore 之于建筑，AI 更可能加速迁移到它、而非取代它 [S5]。保险公司的核保、理赔、保单核心账本是数十年积累的确定性数据，agent 无法凭空生成；而 PS 7.1 的定价，在 SaaSpocalypse 的无差别抛售里把它当成了普通 SaaS [真调]。它的链上不可替代性在于：保险是确定性输出不容妥协的领域（理赔金额、合规），正是 AI 概率性输出最不被接受、专有数据护城河最硬的场景 [S17]。数据画像上，GWRE 收入 $1.42B、PS 7.1、FCF yield 2.8%、EV/EBITDA 76.9（反映其仍在云迁移投入期、利润未释放）[真调]，这是"高质量数据资产 + 利润未释放"的组合，2 级期权在云迁移完成 + agent 决策放量后的利润释放。
+
+**核心标的 2 深度论述（NICE）**。NICE 是"被当成颠覆对象、实为颠覆者"的典型错配。市场把它当成被 agent 颠覆的旧 CX 厂商打到 PS 1.8、PE 10.9 [真调]，但它本身是 agentic CX 的领先供应商：AI 与自助 ARR $328M（+66% YoY）、backlog +25% YoY、2026 云收入指引加速到 14.5-15% [S14]。它的链上位置在第四层垂直 agent，命脉是 CX 数据 + 企业合规部署 + Cognigy 的 agentic 能力。数据画像极具吸引力：EV/EBITDA 仅 6.1、FCF yield 9.0%、PE 10.9 [真调]，这是把一个 AI ARR 高增的 CX 龙头定价到了深度价值区间。核心风险是 CX 席位压缩的双刃效应（新 AI ARR 能否盖过旧席位流失），这是 2 级的关键验证点。
+
+**反方标的论述（C3.ai）**。C3.ai 是产业链逻辑下最可能被证伪/价值陷阱的标的。它处在第五层"待证"位置，FQ3 2026 收入仅 $53.3M、GAAP 毛利率 17%、持续亏损（每股 -$0.94）、靠联邦订单（+134% YoY）撑增长 [S13]。它的结构性弱点是：缺乏专有数据围栏、缺乏分发、靠政府合同集中度撑营收，正是论断 1 与 4 里被两端挤压、且无护城河缓冲的标的。触发信号：联邦订单增速放缓 + 毛利率持续低位 + 现金消耗（现金 $621.9M、按当前消耗约 30 月跑道）。本节只描述风险结构，不给做空指令。
+
+**Watchlist 持续关注**：
+
+| Ticker | 名 | 国 | 关注理由 | 升级为核心标的的触发 |
+|---|---|---|---|---|
+| DOCU | DocuSign | 美 | 电签网络效应 + AI IAM | NRR 企稳 + AI 产品放量 ◆美 |
+| ZM | Zoom | 美 | 现金占 EV 44% 下行缓冲 | AI Companion 货币化兑现 ◆美 |
+| PATH | UiPath | 美 | RPA→agentic 转型期权 | 用量定价净留存回升 ◆美 |
+| MNDY | monday.com | 以 | 席位+信用点转型样本 | 信用点收入放量 + NRR 企稳 ●以 |
+| U | Unity | 美 | 游戏引擎 AI 期权 | 扭亏 + AI 工具货币化 ◆美 |
+
+---
+
+# 九、风险、证伪与月度跟踪
+
+*这一节告诉读者"什么时候应该放弃这个 thesis" + 提供月度跟踪 KPI。*
+
+任何投资 thesis 都需要清晰的 kill condition。本研究四大论断的 kill 条件如下：
+
+| Thesis | Kill 触发 | 概率（3yr）| 应对动作 |
+|---|---|---|---|
+| 论断一（分叉）| 至 2027 底 at-risk 组 NRR 中位数仍 >105% | 中 | 放弃"薄工具结构性受损"判断 |
+| 论断二（货币化滞后）| 任一龙头 agent 收入占总收入 >15%（2026 底）| 低 | 上修赢家估值、滞后判断证伪 |
+| 论断三（广告引擎最实）| APP H2 2026 收入增速跌破 25% YoY | 中 | 削弱"广告引擎兑现度最高"判断 |
+| 论断四（命门在两端）| bundling 未致任何 at-risk 席位负增长且 NET PS <15x | 中 | 重审"中间层被挤"结构判断 |
+
+四个 kill 条件背后是同一个底层风险：agent 货币化的兑现度。Gartner 预计至 2027 底逾 40% 的 agentic AI 项目将被取消（成本失控、价值不清、风控不足），当前仅 11% 企业把 agent 跑进生产 [S21]。若这一兑现大面积失败，论断 2 先倒（agent 收入永远确认不上来），进而拖累赢家的牛市估值；反过来，若兑现快于预期，论断 2 的"滞后"被证伪、应上修而非下修赢家。这是本研究最大的双向不确定性。
+
+**全链 worst case**。最坏情景是"agent 证伪 + bundling 通杀"的叠加：企业 agent 项目大面积取消（Gartner 40% 取消落地），同时微软 E7 把独立 SaaS 的协作/安全/BI 功能全面 bundling 替代 [S9]，导致不仅薄工具席位崩塌、连部分记录系统的边缘功能也被侵蚀。此情景下，软件前瞻 P/E 从 22.7x 进一步下探破 18x，至-risk 组多家退市或被并购，记录系统的 agent ARPU 扩张被证伪、估值回到纯订阅折现。概率不高但需监控，触发信号是 Gartner 取消率超预期 + 三家以上 at-risk 名席位转负同时发生。
+
+**月度跟踪 KPI**（Top 10，按 link 分组）：
+
+| KPI | link | 危险阈值 | 数据源 |
+|---|---|---|---|
+| 软件前瞻 P/E | 全行业 | <18x | IGV/FactSet [S8] |
+| Agentforce ARR 环比 | 记录系统 | <20% | CRM 8-K [S4] |
+| NOW cRPO 同比 | 记录系统 | <15% | NOW 8-K [S5] |
+| APP 收入增速 | 广告引擎 | <25% YoY | APP 财报 [S7] |
+| APP e-commerce GA 留存 | 广告引擎 | 放量失速 | APP 财报/电话会 [S7] |
+| at-risk 组席位同比 | 薄工具 | 三家以上转负 | 各财报 [S8] |
+| MNDY 信用点收入占比 | 薄工具 | 转型停滞 | MNDY 6-K [S15] |
+| NICE AI ARR 增速 | CX | <40% YoY | NICE 6-K [S14] |
+| NET token 处理量 | 推理 | 放量失速 | Cloudflare 披露 [S10] |
+| 微软 E7 渗透 | 分发 | 加速替代 | 渠道/微软披露 [S9] |
+
+**Catalyst 日历**：
+
+| 时间 | Catalyst | 影响 link | 推测影响 |
+|---|---|---|---|
+| 2026 H2 | APP e-commerce 自助 GA 放量验证 | 广告引擎 | binary，决定 APP re-rate [S7] |
+| 2026-08 | Intuit QuickBooks 用量定价上线 | 垂直数据 | 用量转型样本 [S11] |
+| 2026-07 | 微软全渠道价格更新 | 分发 | bundling 压力 [S9] |
+| 2026 各季 | CRM/NOW agent ARR 占比披露 | 记录系统 | 论断 2 兑现度 [S4][S5] |
+| 持续 | SEC 对 APP 数据问询进展 | 广告引擎 | 监管尾部 [S7] |
+| 2027 | Gartner agentic 项目取消率 | 全行业 | 论断证伪关键 [S21] |
+
+**警报阈值**：软件前瞻 P/E 破 18x（二次杀估值）、三家以上 at-risk 名席位转负、任一龙头 agent ARR 环比连续两季 <20%、APP H2 增速破 25%，任一触发即重审对应论断。
+
+---
+
+# 十、邻接产业与历史类比
+
+*这一节把当前产业放进更大的研究网络。*
+
+AI 应用与 Agent 不是孤岛，它的上游与邻接决定了它的成本结构与价值归属。最紧的邻接是底层算力与基础模型，agent 的每一次推理都消耗 token，AI 总支出 $2.59T 里的大头在算力 [S2]，这条赛道（AI 数据中心、加速器、CPO 光互联）已在本研究系统的邻接容器有覆盖。理解 agent 应用层的利润，必须同时理解它向上游算力支付了多少"推理税"。
+
+**强邻接产业（Top 3）**：
+
+第一是 AI 数据中心与算力（强度 ⭐⭐⭐⭐⭐），它是 agent 的成本底座，推理成本（token）是 agent 单位经济学最大变量，GPU 利用率均 20-40% 决定了推理基础设施的经济性 [S10]。建议跟进：`/industry "AI 数据中心电力"`（本系统已有覆盖）。
+
+第二是基础大模型层（强度 ⭐⭐⭐⭐），OpenAI/Anthropic/Google 的模型能力与定价直接决定 app 层 agent 的商品化速度，基础模型越便宜，Duolingo/ADBE 这类应用的护城河越受拷问 [S16]。建议跟进：`/industry "基础大模型与推理"`。
+
+第三是网络安全（强度 ⭐⭐⭐⭐），agent 自主执行带来新的身份、权限、审计风险，微软 Entra/Security Copilot 与独立安全厂商（Zscaler/CrowdStrike）正争夺 agent 安全控制层 [S9]。建议跟进：`/industry "AI 时代网络安全"`。
+
+**历史类比**。本研究只保留一个可量化的深类比：2002-2009 年报纸业被互联网颠覆。相似变量：一个成熟、高现金流的行业被一种新技术（互联网/agent）从根上改变价值捕获方式，市场情绪先于基本面崩塌。不同变量：报纸的核心资产（读者注意力）被整体迁移、无可守，而软件的核心资产（专有工作流数据 + 合规嵌入）对记录系统/数据围栏仍不可被 agent 重生成 [S17]。历史基准率：报纸群体 2002-2009 损失约 95% 价值，直到前瞻盈利预期完全重置才企稳 [S8]，这给软件的估值底提供了一个残酷参照，盈利预期不稳、估值底就不来。**类比失效条件**：若 agent 货币化在 2026-2027 大面积兑现（记录系统 agent ARR 占比快速升破 10%），则软件不会重演报纸的整体塌缩，而是分叉，这正是本研究与"SaaS 全死"叙事的核心分歧。
+
+**跨产业 alpha 标的**：
+
+| 标的 | 本产业叙事 | 邻接叙事 | 合并 thesis |
+|---|---|---|---|
+| NET | agent 推理控制层 | AI 数据中心边缘 | 边缘推理 + agent 双重暴露 |
+| INTU | 财务数据图谱 fortress | 金融科技/支付 | 数据围栏 + fintech 双重 |
+| META | AI 广告引擎 | 基础模型（Llama）+ 算力自建 | 广告兑现 + 全栈 AI |
+
+**本研究 gap 与下次 update trigger**：本报告对基础模型层（多为私有）的覆盖较浅，且 agent 货币化"量"缺统一行业口径。下次 update 触发：(1) 2026 H2 APP e-commerce GA 结果；(2) 任一季度龙头 agent ARR 占比披露重大变化；(3) 软件前瞻 P/E 破 18x 或三家 at-risk 席位转负。
+
+---
+
+# 十一、结论与下一步
+
+*这一节是闭环。*
+
+回到 §0 与 §1 提出的四个核心论断，经过 §4-§10 的产业链全方位检验，本研究的整体判断是：AI agent 不会杀死 SaaS，但会把它劈成截然不同的两半，而当前 SaaSpocalypse 的无差别抛售恰恰没有充分定价这种分叉。数据显示，市场把软件前瞻 P/E 一齐打到 22.7x（史上首次低于标普 500）[S8]，但记录系统与数据围栏（CRM PE 18.4、SAP 21.9、INTU 16.3、NICE 10.9、ADBE 11.6 [真调]）拥有 agent 无法重生成的专有数据与分发优势，被错杀的程度远超薄工具应有的折价。这不是堆砌数据，而是把"SaaS 全死"这个论断在产业链上逐层试验后的结论，它在第五层成立，在第三、四层不成立。
+
+## 11.1 核心论断验证情况（V2.0）
+
+| 论断 | 验证状态 | 关键证据 | 更新看法 |
+|---|---|---|---|
+| 论断 1（分叉）| 🟡 当前证据一致 | FICO PS 12.2 vs ASAN PS 2.0 的估值分叉 + Atlassian 席位转负 [S8] | 维持；待 2027 底 NRR 数据裁决 |
+| 论断 2（货币化滞后）| 🟡 当前证据一致 | Agentforce ARR $1B+ 占 CRM 收入 <3% [S4] | 维持；占比升破 5% 是兑现起点 |
+| 论断 3（广告引擎最实）| 🟡 当前证据一致 | APP +59% YoY、EBITDA 85% 已兑现 [S7] | 维持；6 月 GA 放量是关键裁决 |
+| 论断 4（命门在两端）| 🟡 hypothesis | 微软 E7 + Action Fabric 刚落地 [S9][S19] | 待 bundling displacement 与 NET 放量验证 |
+
+四个论断目前都处于"当前证据一致"或"假设"状态，没有任何一个达到"已裁决"，因为 agent 货币化的兑现是一个 2026-2027 才会结算的过程，当前的截面数据只能支撑方向，不能宣告确认。本轮研究相对市场共识新增的关键变量是"分发 + 数据围栏作为命门"（论断 4），市场在杀估值时主要盯着"席位会不会被 agent 替代"（论断 1），却忽视了价值正向分发与数据围栏两端迁移这一更深的结构。被产业链最强力支持的是论断 1（分叉，估值数据已现分化）与论断 3（广告引擎，收入端已兑现）；最待验的是论断 4（命门在两端，bundling 与数据围栏政策刚落地，displacement 尚未显形）。
+
+**Top 3 立即行动**：
+
+第一，把 §8 的"被错杀 fortress"组（CRM/SAP/INTU/NICE/ADBE/GWRE）作为后续个股深研的最高优先输入，它们是分叉论断里确定性最高、且估值已被打到市场平均以下的一类，错配最值得逐个验证。
+
+第二，把 APP 的 6 月 e-commerce 自助 GA 设为单一最关键的近端 catalyst 监控，它是论断 3 的 binary 裁决点，放量成功验证"广告引擎兑现度最高"，失败则削弱整个 agentic ROI 叙事的存在性证明。
+
+第三，建立 at-risk 组（ASAN/MNDY/DOCU/C3.ai）的"困境反转 vs 价值陷阱"分流监控，以 NRR 企稳 + 席位同比 + 用量定价放量三个变量逐个判别，避免把整组当成低位价值机会误抄底。
+
+**Top 3 M3 深研入口**：
+
+第一优先 GWRE（Guidewire），保险核心系统的专有确定性数据 vs PS 7.1 的错配，是分叉论断里"被低估数据围栏"确定性最高的样本，云迁移完成后的利润释放是 2 级期权。
+
+第二优先 NICE，AI ARR +66% × PE 10.9 的"颠覆者被当成被颠覆者"极端错配，核心验证 CX 席位压缩的净效应。
+
+第三优先 APP（AppLovin），全报告唯一收入端已兑现的 agentic ROI 样本，6 月 GA 放量 + SEC 问询是高 beta 期权，需独立深研其 e-commerce 留存与监管尾部。
+
+**给基金老板 / 投委会 30 秒电梯版**：
+
+> AI agent 不会杀死 SaaS，而是把软件劈成"控分发与专有数据的两端（CRM/NOW/SAP/INTU/FICO/GWRE/NICE）re-rate 向上"与"薄工作流中间层（ASAN/MNDY/DOCU/C3.ai）席位压缩"两半；2026 年 SaaSpocalypse 把整个篮子无差别打到史上首次低于标普 500 倍数，错杀了被数据围栏保护的 fortress；当下唯一在收入端兑现的 agentic ROI 是广告引擎（APP +59%、EBITDA 85%），企业 agent 仍在 booking、收入确认滞后 4-8 季度，错配窗口在"被错杀的 fortress（GWRE/NICE/INTU/ADBE）"与"已兑现的广告引擎（APP）"。
+
+---
+
+# 附录 A：跨 link 对比矩阵
+
+## A.1 定价充分度矩阵
+
+| Link | 1级估值 | 2级期权 | thesis | 错配方向 | 时间窗口 |
+|---|---|---|---|---|---|
+| 记录系统 | booking 强 | 收入确认滞后 | fortress | CRM/SAP 被错杀 | 2026-27 |
+| 广告引擎 | 已兑现 | e-commerce 放量 | 论断 3 | APP 高 beta | 2026 H2 |
+| 推理基础设施 | PS 36 已贵 | agent 工作负载放量 | 论断 4 | NET 高定价 | 2027 |
+| 垂直数据 | FICO 已定价 | GWRE/INTU 被低估 | fortress | GWRE/INTU 错配 | 2026-27 |
+| CX agent | NICE 被错杀 | 席位压缩双刃 | 论断 1 | NICE 强错配 | 2026 |
+| 自动化 | PATH 折价 | agentic 放量 | 论断 4 | PATH 期权 | 2026-27 |
+| 创意消费 | ADBE 深度价值 | Firefly 货币化 | 论断 1 | ADBE 争议错配 | 2026-27 |
+| 薄工作流 | 已大幅折价 | 转型成败定生死 | 论断 1 | 价值陷阱 vs 反转 | 2027 |
+
+## A.2 生命周期 vs 卡脖子矩阵
+
+<!--VIZ:lifecycle-->
+```
+                       卡脖子: 极强(命门)    强        中        弱
+生命周期: Embryonic     NET 推理控制层      —         —         —
+         Growth         分发/数据围栏       APP 广告  PATH      ASAN/MNDY
+                        (CRM/NOW/MSFT)      NICE      DUOL      薄工具组
+         Maturity       FICO/GWRE 数据      SAP/INTU  ADBE      DOCU/ZM
+         Decline        —                  —         —         纯席位工具
+         Renewal        —                  CX agent  RPA→agent —
+```
+
+## A.3 1级 vs 2级估值 ASCII 气泡图
+
+<!--VIZ:bubble-->
+```
+估值/关注度 ↑
+高 │ NET🌿        NOW          APP
+   │ (PS36期权)   (PE58)       (已兑现)
+中 │      FICO🌿        CRM/SAP        META
+   │      (标准溢价)    (被错杀)       (性价比)
+低 │  ASAN/BILL    GWRE🌿/INTU    NICE/ADBE
+   │  (价值陷阱?)  (被低估数据)    (强错配·便宜)
+   └────────────────────────────────────────→
+     弱护城河        中            强(命门/数据)  不可或缺度→
+   * 右下 = 便宜却命门 = 机会区（GWRE/NICE/ADBE/INTU）
+```
+
+## A.4 ESG / 客户 / 脆弱度 Heatmap
+
+| Link | 监管风险 | 客户集中度 | AI 商品化脆弱度 | 综合 |
+|---|---|---|---|---|
+| 记录系统 | 中（数据主权）| 低 | 低（专有数据）| 低风险 |
+| 广告引擎 | 高（SEC/隐私）| 中 | 低 | 中风险 |
+| 垂直数据 | 中（行业监管）| 低 | 极低 | 最低风险 |
+| 薄工作流 | 低 | 中 | 极高 | 最高风险 |
+
+## A.5 投资优先级总排序
+
+| Rank | Link | 核心理由 | 表达标的 |
+|---|---|---|---|
+| 1 | 垂直数据围栏 | 被错杀 + 不可重生成数据 | GWRE/INTU/FICO |
+| 2 | 记录系统 fortress | 分发 + agent ARPU + 被错杀 | CRM/SAP/NICE |
+| 3 | 广告引擎 | 唯一收入已兑现 | APP/META |
+| 4 | 创意消费 | ADBE 深度价值争议 | ADBE/DUOL |
+| 5 | 推理基础设施 | 命门确定但已贵 | NET |
+| 6 | 自动化转型 | RPA→agentic 期权 | PATH |
+| 7 | 薄工作流 | 风险监控，分流判别 | 监控为主 |
+
+---
+
+# 附录 B：完整 KPI 速查表
+
+**记录系统**：Agentforce ARR 及环比、NOW cRPO 同比、agent ARR 占总收入比例、NRR、E7 displacement。
+**广告引擎**：APP 收入增速、调整后 EBITDA 率、e-commerce GA 后留存、单客 ROAS、SEC 问询进展。
+**垂直数据**：GWRE 云迁移进度与利润释放、INTU 用量定价收入占比、FICO 评分使用量、Pega Cloud ACV。
+**CX agent**：NICE AI ARR 增速、backlog 同比、席位压缩净效应。
+**推理基础设施**：NET token 处理量、付费客户数、Workers AI agent 工作负载放量。
+**薄工作流**：各家席位同比、NRR、用量/信用点收入占比、转型执行。
+
+---
+
+# 附录 C：信息源与方法论
+
+## C.1 数据源
+
+**行业研究**：Gartner（AI 支出/agent 渗透）、Mordor/Grand View（agentic 市场规模）、IDC/Bain/HarbourVest/Oliver Wyman（SaaSpocalypse 与 moat 框架）、Deloitte TMT 2026。
+**财务数据**：yfinance（26 标的真调，2026-06，收入 TTM 口径）+ 各公司 SEC 8-K/6-K（CRM/NOW/PEGA/C3.ai/NICE/MNDY）。
+**新闻/一手**：salesforceben、AppLovin/Cloudflare 官方博客、PYMNTS、TheStreet、Globe and Mail。
+
+主要来源登记（≥10）：
+
+- S1 Gartner — 40% 企业应用内嵌 agent / 2027 取消率：gartner.com（一手机构）
+- S2 Gartner — AI 支出 $2.59T 2026：digitalapplied 汇编 Gartner May 2026（机构）
+- S3 Mordor/Grand View — agentic 市场规模 ~$10B：tech-insider/unicoconnect（机构二手）
+- S4 Salesforce Agentforce ARR：salesforceben + SEC 8-K crm（一手披露）
+- S5 ServiceNow Q4 2025 cRPO/Now Assist：SEC 8-K erq4fy25（一手披露）
+- S6 SaaS 定价迁移 21%→15%/SaaSpocalypse：softwareseni/mindstudio（媒体/机构）
+- S7 AppLovin Q1 2026/AXON：axon.ai blog + mlq.ai（一手+分析师估算）
+- S8 SaaSpocalypse $1-2T/前瞻 PE 22.7x：financialcontent/tech-insider（媒体）
+- S9 微软 M365 E7 $99 bundling：windowsforum/epcgroup（媒体）
+- S10 Cloudflare Workers AI/Agents Week 2026：blog.cloudflare.com（一手）
+- S11 Intuit 50M tx/周用量定价 + Adobe 信用点：thestreet/pymnts（媒体）
+- S12 Pega Q1 2026 Blueprint ACV：SEC 8-K pega + pega.com（一手）
+- S13 C3.ai FQ3 2026：c3.ai + SEC 8-K（一手披露）
+- S14 NICE Q4 2025/Cognigy：SEC 6-K + cmswire（一手+媒体）
+- S15 monday.com Q1 2026：SEC 6-K（一手披露）
+- S16 Duolingo 2026 DAU/Max：globeandmail/classcentral（媒体）
+- S17 moat 框架/MongoDB：oliverwyman/harbourvest/bain（机构）
+- S18 UiPath ARR/agentic：reworked.co/aigovmap（媒体）
+- S19 SAP/NOW/WDAY pay-to-play Action Fabric：pymnts（媒体）
+- S20 Intercom Fin/Zendesk 结果定价：mindstudio/softwareseni（媒体）
+- S21 Gartner（2025-06-25 独立稿）— 2027 底 40% agentic 项目取消 / 仅 11% 进生产 / 60% 两年内部署：gartner.com（一手机构·与 S1 的'40% 内嵌'为两篇不同稿）
+
+## C.2 方法论
+
+本研究使用「行业研究方法论 V2.16（证据可溯源版）」生成。财务数据全程真调 yfinance，未从训练记忆编造；行业数据带来源分级（一手披露/机构/媒体）。
+
+## C.3 配套数据
+
+机器可读结构化数据：`AI_Applications_Agents_data.json`（含全部标的真调估值、charts、KPI、stress test、sources）。
+
+## C.4 下次更新
+
+- 季度自动（每 3 月）
+- 事件触发：APP e-commerce GA 结果 / 龙头 agent ARR 占比披露 / 软件前瞻 PE 破 18x / 三家 at-risk 席位转负
+
+---
+
+# 附录 D：紫苏叶清单（金枪鱼 vs 紫苏叶）
+
+> 方法论来源：Serenity「紫苏叶理论」，最昂贵 ≠ 最不可或缺。软件业的"紫苏叶"不在物理材料，而在 agent 无法重生成的专有数据、监管嵌入的确定性标准、与 agent 工作流的延迟/编排命门。
+
+软件业的 chokepoint 与制造业不同：它分**设计/数据 know-how（不可采购）> 专有数据围栏 > 分发渠道 > 通用功能**四类，越靠前越是真命门。以下逐链节列出金枪鱼（明星）与紫苏叶（隐形/不可重生成命门）。
+
+| 链节 | 金枪鱼（最贵/明星）| 🌿 紫苏叶（隐形命门）| chokepoint 论证 | 红队：若被替代靠什么 | chokepoint 类型/等级 |
+|---|---|---|---|---|---|
+| 垂直决策 | NOW/CRM（最贵记录系统）| FICO 信用评分（PS 12.2）| 监管嵌入 de facto 标准，agent 无法重生成历史信用数据 | 需监管重新认可新标准 + 数十年数据 | 数据 know-how ⭐⭐⭐⭐⭐ |
+| 保险 | CRM（横向 CRM）| GWRE 保险核心系统（PS 7.1）| P&C 核保/理赔账本是确定性数据，AI 不容概率输出 | 需重建核心系统 + 十年数据迁移 | 专有数据 ⭐⭐⭐⭐⭐ |
+| 财务 | INTU（PE 16.3）| INTU 50M tx/周数据图谱 | 周级千万交易构成不可复制的财务数据网络 | 需重建同等规模交易数据流 | 专有数据 ⭐⭐⭐⭐ |
+| 推理 | NET（PS 36）| NET AI Gateway 多模型控制层 | agent 首 token 延迟 + 跨 provider 路由咽喉，用量计费契合 | 超大规模云自建推理控制层（正在做）| 编排/分发 ⭐⭐⭐⭐ |
+| agent 基础设施 | —（多私有）| eval/观测/向量库/agent 身份 | agent 可靠性的隐形命门，市值微小流动性稀薄 | 通用模型内置 eval、商品化 | →需补（私有：Braintrust/向量库未上市）⭐⭐⭐ |
+| 分发 | MSFT（M365）| M365 E7 bundling 默认分发 | $99 打包使分开买不划算，分发即护城河 | 反垄断限制 bundling | 分发渠道 ⭐⭐⭐⭐⭐ |
+
+**紫苏叶清单一句话结论**：软件业真正的紫苏叶不是某个微小市值的零件供应商，而是 agent 无法重生成的"监管嵌入数据标准（FICO）+ 专有确定性账本（GWRE/INTU）+ 推理编排命门（NET）+ 默认分发（微软 E7）"，这四类是 agent 时代价值向两端迁移的物理底层，纯 agent 基础设施（eval/向量库/身份）多为私有、标"→需补"，绝不编造名字。
+
+---
+
+*生成时间：2026-06-29*
+*方法论版本：行业研究方法论 V2.16（证据可溯源版）*
+*配套数据：`AI_Applications_Agents_data.json`*
+*下次更新：APP e-commerce GA 结果 / 龙头 agent ARR 占比 / 软件前瞻 PE 破 18x*
+</script>
+<script id="charts" type="application/json">{"masthead": {"kicker": "BCA 产业研究 · AI Applications & Agents · 2026Q2", "standfirst": "AI agent 不杀 SaaS，把它劈成控数据的两端 re-rate 向上、薄工作流席位压缩两半", "meta": ["<span><b>口径<\/b> 财务真调 yfinance 2026-06 · 收入 TTM<\/span>", "<span><b>标的池<\/b> 26 只 L4 全覆盖<\/span>", "<span><b>论断<\/b> 4 条·均当前证据一致/假设<\/span>"]}, "dashboard": {"tam": {"cap": "agentic AI 软件 TAM 三角验证（$B）", "unit": "B", "categories": ["自下而上(2029E)", "Gartner企业应用(2035E)", "Mordor纯agentic(2031E)"], "values": [240, 450, 57], "colors": ["#8c2f23", "#b8863a", "#9a9a8c"]}, "scatter": {"cap": "市值 × 命门/不可或缺度（气泡=敞口）", "expLabels": ["", "薄工具", "记录系统", "数据围栏", "命门(不可重生成)"], "points": [{"name": "GWRE", "mcap": 10.1, "exposure": 4, "tradable": 1}, {"name": "FICO", "mcap": 27.4, "exposure": 4, "tradable": 1}, {"name": "NICE", "mcap": 5.4, "exposure": 3, "tradable": 1}, {"name": "CRM", "mcap": 129.7, "exposure": 3, "tradable": 1}, {"name": "APP", "mcap": 160.3, "exposure": 4, "tradable": 1}, {"name": "NET", "mcap": 84.2, "exposure": 4, "tradable": 1}, {"name": "ASAN", "mcap": 1.7, "exposure": 1, "tradable": 1}]}, "portfolio": {"cap": "标的图谱按链层分布（标的数）", "items": [["记录系统", 6], ["垂直数据", 3], ["薄工作流", 8], ["创意消费", 4], ["广告引擎", 2], ["CX/自动化", 3]]}}, "chain": {"lead": "美国控分发与记录系统 + 广告引擎，私有/基础模型控上游，推理基础设施成新命门", "layers": [{"n": 0, "name": "算力/基础模型/推理基础设施", "ch": 5, "def": "agent 的成本与延迟底座", "p": [["NVIDIA 加速器(80%+训练)", "us", 0, 0, "NVDA"], ["AWS/Azure/GCP 超大规模云", "us", 0, 0, ""], ["OpenAI/Anthropic 基础模型", "us", 1, 0, ""], ["Cloudflare Workers AI 边缘推理", "us", 0, 1, "NET"]], "note": "推理成本(token)是 agent 单位经济学最大变量"}, {"n": 1, "name": "agent 框架/编排/中间件", "ch": 3, "def": "agent 的大脑与工具调用层", "p": [["LangChain/LlamaIndex(私有)", "us", 1, 0, ""], ["Microsoft Agent 365/Copilot Studio", "us", 0, 0, "MSFT"], ["Cloudflare Agents SDK", "us", 0, 0, "NET"], ["eval/observability(Braintrust 私有)", "us", 1, 1, ""]]}, {"n": 2, "name": "分发渠道 + 专有数据围栏(卡脖子)", "ch": 5, "def": "决定谁能触达企业数据=终极议价权", "p": [["Microsoft M365 E7 bundling($99)", "us", 0, 0, "MSFT"], ["Salesforce Agentforce/Data Cloud", "us", 0, 0, "CRM"], ["ServiceNow Action Fabric 数据围栏", "us", 0, 0, "NOW"], ["SAP API policy/Joule", "eu", 0, 0, "SAP"], ["Meta 分发", "us", 0, 0, "META"]]}, {"n": 3, "name": "横向记录系统/agentic 平台", "ch": 4, "def": "企业操作系统·agent ARPU 扩张", "p": [["Salesforce", "us", 0, 0, "CRM"], ["ServiceNow", "us", 0, 0, "NOW"], ["SAP", "eu", 0, 0, "SAP"], ["Workday", "us", 0, 0, "WDAY"], ["Intuit(50M tx/周)", "us", 0, 1, "INTU"], ["HubSpot", "us", 0, 0, "HUBS"]]}, {"n": 4, "name": "垂直/职能 agent 应用", "ch": 4, "def": "专有确定性数据护城河", "p": [["Fair Isaac 决策评分(de facto 标准)", "us", 0, 1, "FICO"], ["Guidewire 保险核心系统", "us", 0, 1, "GWRE"], ["Pegasystems BPM/Blueprint", "us", 0, 0, "PEGA"], ["NICE CX/Cognigy", "us", 0, 0, "NICE"], ["Adobe Firefly", "us", 0, 0, "ADBE"], ["Duolingo", "us", 0, 0, "DUOL"], ["UiPath RPA→agentic", "us", 0, 0, "PATH"], ["Autodesk 设计", "us", 0, 0, "ADSK"], ["Unity 游戏引擎", "us", 0, 0, "U"], ["Twilio CPaaS", "us", 0, 0, "TWLO"]]}, {"n": 5, "name": "协作/参与/薄工作流 SaaS(at-risk)", "ch": 2, "def": "被两端挤压的中间层", "p": [["Asana", "us", 0, 0, "ASAN"], ["monday.com", "cn", 0, 0, "MNDY"], ["DocuSign", "us", 0, 0, "DOCU"], ["Zoom", "us", 0, 0, "ZM"], ["GitLab", "us", 0, 0, "GTLB"], ["BILL Holdings", "us", 0, 0, "BILL"], ["C3.ai(待证)", "us", 0, 0, "AI"]], "note": "MNDY/NICE 实为以色列(图示归 EU/其他)"}, {"n": 6, "name": "广告/推荐 agentic 引擎(收入已兑现)", "ch": 4, "def": "唯一收入端已兑现的 agentic ROI", "p": [["AppLovin AXON(85% EBITDA 率)", "us", 0, 0, "APP"], ["Meta Advantage+", "us", 0, 0, "META"]]}, {"n": 7, "name": "企业买家 + 商业模式", "ch": 1, "def": "定价范式迁移", "p": [["席位制→用量/结果/信用点/agent-as-employee", "us", 0, 0, ""], ["TCO 过渡期 +30%(双付 12-24 月)", "us", 0, 0, ""]]}]}, "valueflow": {"cap": "AI 应用与 Agent 产业资金流总览（利润向两端迁移）", "sources": [{"name": "企业软件 IT 预算 ~$430B 大盘", "detail": "agentic 软件 ~$10B 细分 + AI 总支出 $2.59T 外溢"}, {"name": "定价范式迁移", "detail": "席位 → 用量/结果/信用点/agent-as-employee"}], "mainflow": [{"id": "①", "name": "横向记录系统", "nature": "收入与现金最大·利润稳", "annot": "◄ 收入最大", "grade": 4, "pool": false, "players": ["CRM 收入 $42.8B/FCF 12.8%", "SAP $37.3B/NOW $14.0B/INTU $20.9B"], "key": "agent 嵌入既有订阅→ARPU 扩张", "flownote": "向上支付分发与数据围栏的议价"}, {"id": "②", "name": "分发渠道+数据围栏(卡脖子)", "nature": "议价权·非直接 app 收入", "annot": "◄ 利润池#1·控制力最强", "grade": 5, "pool": true, "players": ["MSFT M365 E7 $99 bundling", "NOW Action Fabric/SAP API policy"], "key": "⭐ 决定谁能触达企业数据=终极议价权", "flownote": "向下垂直层提供数据接入"}, {"id": "③", "name": "垂直确定性 agent", "nature": "收入中·净利率高·专有数据", "annot": "护城河最硬", "grade": 4, "pool": true, "players": ["FICO PS 12.2/GWRE PS 7.1", "PEGA/NICE/ADBE Firefly"], "key": "监管嵌入数据·AI 不容概率输出", "flownote": ""}], "parallel": [{"id": "④", "name": "平行流 1：广告/推荐 agentic 引擎", "grade": 5, "annot": "利润池#2·已兑现", "detail": "APP AXON 调整后 EBITDA 率 85%/FCF $1.29B季；META Advantage+"}, {"id": "⑤", "name": "平行流 2：推理基础设施", "grade": 4, "annot": "利润池#3·agent 期权", "detail": "NET Workers AI/AI Gateway 用量计费 + 边缘延迟命门"}], "pools": [{"n": 1, "text": "<b>广告引擎<\/b>(APP/META) 极高利润率 + 已兑现", "grade": 5}, {"n": 2, "text": "<b>分发+数据围栏<\/b>(MSFT/NOW/CRM 数据层) 终极议价权", "grade": 5}, {"n": 3, "text": "<b>记录系统现金流<\/b>(CRM/SAP/INTU 高 FCF) 稳厚利", "grade": 4}, {"n": 4, "text": "<b>垂直确定性数据<\/b>(FICO/GWRE) 不可重生成护城河", "grade": 4}], "takeaway": "利润正从中间薄工具向两端(分发/数据围栏 + 广告引擎/推理)迁移，这是 agent 时代最重要的资金流方向"}, "geo": {"cap": "国别分布：美国近乎全栈垄断 + 德国/以色列少数前哨", "countries": [{"name": "美国", "color": "#8c2f23", "players": ["记录系统 CRM/NOW/WDAY/INTU", "分发 MSFT", "广告 APP/META", "推理 NET", "垂直 FICO/GWRE/PEGA/ADBE/PATH"]}, {"name": "德国", "color": "#b8863a", "players": ["SAP(ERP 龙头·Joule·API policy 数据围栏)"]}, {"name": "以色列", "color": "#6a7b8c", "players": ["NICE(CX AI 龙头+Cognigy)", "monday.com(协作·席位+信用点)"]}]}, "bubble": {"cap": "估值 × 不可或缺度（右下=便宜却命门=机会区）", "xLabel": "不可或缺度 →（命门/专有数据）", "yLabel": "估值/关注度 ↑", "points": [{"name": "NET🌿", "x": 2.7, "y": 2.8, "type": "🌿", "size": 24}, {"name": "NOW", "x": 2.2, "y": 2.7, "type": "◆", "size": 22}, {"name": "APP", "x": 2.6, "y": 2.6, "type": "◆", "size": 24}, {"name": "FICO🌿", "x": 2.9, "y": 2.0, "type": "🌿", "size": 22}, {"name": "CRM", "x": 2.3, "y": 1.5, "type": "◆", "size": 24}, {"name": "SAP", "x": 2.2, "y": 1.5, "type": "◆", "size": 22}, {"name": "META", "x": 2.4, "y": 1.4, "type": "◆", "size": 26}, {"name": "GWRE🌿", "x": 2.8, "y": 0.9, "type": "🌿", "size": 20}, {"name": "INTU🌿", "x": 2.6, "y": 0.9, "type": "🌿", "size": 22}, {"name": "NICE", "x": 2.4, "y": 0.7, "type": "◆", "size": 18}, {"name": "ADBE", "x": 2.0, "y": 0.7, "type": "◆", "size": 22}, {"name": "ASAN", "x": 0.7, "y": 0.6, "type": "○", "size": 14}, {"name": "AI", "x": 0.6, "y": 0.8, "type": "○", "size": 12}]}, "lifecycle": {"cap": "生命周期 × 卡脖子矩阵（右上=成长×命门=最佳象限）", "cols": ["极强（命门）", "强", "中", "弱"], "rows": [{"stage": "Embryonic 胚胎", "cells": [["NET 推理控制层"], [], [], []]}, {"stage": "Growth 成长", "cells": [["分发/数据围栏 CRM/NOW/MSFT"], ["APP 广告", "NICE"], ["PATH", "DUOL"], ["ASAN/MNDY 薄工具"]]}, {"stage": "Maturity 成熟", "cells": [["FICO/GWRE 数据"], ["SAP/INTU"], ["ADBE"], ["DOCU/ZM"]]}, {"stage": "Decline 衰退", "cells": [[], [], [], ["纯席位工具"]]}, {"stage": "Renewal 再生", "cells": [[], ["CX agent"], ["RPA→agent"], []]}]}, "cycle": {"cap": "AI 应用与 Agent · 双轴定位（生命周期 × 周期相位）", "subcap": "secular 成长早期 × cyclical 收缩后触底重估，分叉尚未被定价", "source": "Gartner/IDC/财务真调", "asof": "2026-06", "secular": {"stage": "成长早期", "pos": 0.35, "note": "企业应用内嵌 agent <5%→40%(2025→2026E)，但仅 11% 进生产"}, "cyclical": {"dominant": "资本+估值周期", "phase": "收缩后触底重估", "pos": 0.7, "note": "软件前瞻 PE 22.7x 史上首破标普 500，IGV 自高点 -22%"}, "signals": {"danger": ["软件前瞻 PE 进一步下探破 18x", "at-risk 组席位同比转负扩散(Atlassian 已现)", "Gartner 2027 底 40% agentic 项目取消"], "safe": ["agent ARR 占总收入升破 5%(Agentforce 现<3%)", "NOW cRPO +25% 维持 >15%", "毛留存仍 ≥90%"], "watch": ["微软 E7 bundling 渗透速度", "APP e-commerce GA 放量", "龙头 agent ARR 占比披露"]}, "benchmark": "vs 2002-2009 报纸业被互联网颠覆：报纸损失 95% 价值直到盈利预期重置才企稳；差异=软件核心数据对 fortress 不可重生成", "basis": "trend 显示估值剧烈收缩 + 基本面尚未崩塌；benchbar 显示 PE 已破历史低位但席位压缩刚起", "synthesis": "secular 成长 + cyclical 触底重估 → 整体被无差别杀估值，但分叉(fortress vs 薄工具)尚未定价 = 错配窗口"}, "trend": {"cap": "AI 应用与 Agent · 强度指标时序（周期证据层）", "subcap": "agentic 市场量高增、龙头 agent ARR 爆发，但收入占比仍极低", "source": "Mordor/各财报", "asof": "2026-06", "indicators": [{"name": "agentic AI 软件市场增速 %", "points": [46.7, 36.4, 33.3, 30.0, 25.0, 12.3, 37.0], "latest": 37, "unit": "%", "dir": "↑", "xrange": "2020–2026", "refline": 40, "reflabel": "40%+ CAGR 目标线", "note": "2025 基数调整后 2026 重回 +37%"}, {"name": "软件前瞻 PE (x)", "points": [34, 31, 28, 26, 24, 22.7], "latest": 22.7, "unit": "x", "dir": "↓", "xrange": "2024–2026", "refline": 18, "reflabel": "18x 二次杀估值线", "note": "史上首次低于标普 500"}, {"name": "CRM Agentforce ARR ($M)", "points": [0, 50, 200, 500, 800, 1000], "latest": 1000, "unit": "$M", "dir": "↑", "xrange": "FY26 进程", "refline": null, "reflabel": "", "note": "一年从 0 到 $1B+，但占 CRM 收入 <3%"}]}, "benchbar": {"cap": "AI 应用与 Agent 当前 vs 历史对标 · 关键比率", "subcap": "估值已破历史低位，但 agent 货币化占比尚未启动", "source": "IGV/FactSet/财务真调", "asof": "2026-06", "analog": "2002-2009 报纸业 / 2000 互联网", "items": [{"name": "软件前瞻 PE (x)", "current": 22.7, "analog": 35, "danger": 18, "unit": "x", "dir": "down", "safe": false, "note": "已破标普 500，距二次杀估值线 18x 不远"}, {"name": "agent ARR 占龙头收入 %", "current": 3, "analog": 0, "danger": 0, "unit": "%", "dir": "up", "safe": true, "note": "升破 5% 是兑现起点，现 <3%"}, {"name": "毛留存 %", "current": 90, "analog": 95, "danger": 85, "unit": "%", "dir": "up", "safe": true, "note": "基本面尚未崩塌，留存仍 ≥90%"}, {"name": "纯席位定价占比 %", "current": 15, "analog": 21, "danger": 25, "unit": "%", "dir": "down", "safe": true, "note": "一年从 21% 降到 15%，迁移加速"}]}, "tickers": {"NOW": "https://finance.yahoo.com/quote/NOW", "APP": "https://finance.yahoo.com/quote/APP", "META": "https://finance.yahoo.com/quote/META", "CRM": "https://finance.yahoo.com/quote/CRM", "ADBE": "https://finance.yahoo.com/quote/ADBE", "NET": "https://finance.yahoo.com/quote/NET", "FICO": "https://finance.yahoo.com/quote/FICO", "DUOL": "https://finance.yahoo.com/quote/DUOL", "PATH": "https://finance.yahoo.com/quote/PATH", "PEGA": "https://finance.yahoo.com/quote/PEGA", "HUBS": "https://finance.yahoo.com/quote/HUBS", "GTLB": "https://finance.yahoo.com/quote/GTLB", "TWLO": "https://finance.yahoo.com/quote/TWLO", "AI": "https://finance.yahoo.com/quote/AI", "WDAY": "https://finance.yahoo.com/quote/WDAY", "INTU": "https://finance.yahoo.com/quote/INTU", "ADSK": "https://finance.yahoo.com/quote/ADSK", "DOCU": "https://finance.yahoo.com/quote/DOCU", "ZM": "https://finance.yahoo.com/quote/ZM", "GWRE": "https://finance.yahoo.com/quote/GWRE", "U": "https://finance.yahoo.com/quote/U", "MNDY": "https://finance.yahoo.com/quote/MNDY", "ASAN": "https://finance.yahoo.com/quote/ASAN", "BILL": "https://finance.yahoo.com/quote/BILL", "SAP": "https://finance.yahoo.com/quote/SAP", "NICE": "https://finance.yahoo.com/quote/NICE"}}</script>
+<script>
+const OX='#8c2f23',GO='#b8860b',GB='#c9a227',CLAY='#cbbfa6',INK='#3a352d';
+const AX={axisLine:{lineStyle:{color:'#cbbfa6'}},axisLabel:{color:'#6b655c'},splitLine:{lineStyle:{color:'#ece6d8'}}};
+const NATCLS={us:'natus',eu:'nateu',cn:'natcn',res:'natres',gate:'natgate'};
+const SYM={us:'◆',eu:'●',cn:'▲',res:'◇',gate:'■'};
+const CH=JSON.parse(document.getElementById('charts').textContent||'{}');
+const TK=CH.tickers||{};
+const stars=n=>{n=Math.max(0,Math.min(5,Math.round(Number(n)||0)));return '★'.repeat(n)+'☆'.repeat(5-n);};  // clamp[0,5] 防 ch/grade 越界 → repeat(负数) 崩图（谐波电机 ch=6 实证）
+const stripFlag=s=>String(s).replace(/^[\u{1F1E6}-\u{1F1FF}\u{2600}-\u{27BF}️\s]+/u,'').trim();
+
+/* ===== 顶部 dashboard：四图竖排全宽 ===== */
+function fr(t,c,id,h){return `<div class="figrow"><h4>${t}</h4><div class="cap">${c}</div><div id="${id}" class="chart" style="height:${h}px"></div></div>`;}
+(function(){try{
+ const d=CH.dashboard||{}; let html='';
+ if(d.tam) html+=fr('市场规模 · 自下而上三角验证',d.tam.cap||'','d_tam',300);
+ if(d.scatter) html+=fr('"买不到"的可视化',d.scatter.cap||'','d_sc',330);
+ if(d.sankey) html+=fr('资金流向 · 速览',d.sankey.cap||'','d_sk',420);
+ if(d.portfolio) html+=fr('推荐组合',d.portfolio.cap||'','d_pf',400);
+ document.getElementById('dashboard').innerHTML=html;
+ if(d.tam) echarts.init(document.getElementById('d_tam')).setOption({grid:{left:138,right:34,top:6,bottom:24},tooltip:{},xAxis:{type:'value',...AX},yAxis:{type:'category',data:d.tam.categories,axisLabel:{fontSize:11,color:'#6b655c'},axisLine:{lineStyle:{color:'#cbbfa6'}}},series:[{type:'bar',barWidth:'58%',data:d.tam.values.map((v,i)=>({value:v,itemStyle:{color:d.tam.colors?d.tam.colors[i]:OX}})),label:{show:true,position:'right',formatter:`\${@[0]}${d.tam.unit||''}`,fontSize:10,color:INK}}]});
+ if(d.scatter){const E=d.scatter.expLabels||[];const pts=d.scatter.points.map(p=>{const tr=(p.tradable!==undefined?p.tradable:p.buy);return {name:p.name,value:[p.mcap,p.exposure],itemStyle:{color:tr?OX:'#c0392b'},symbolSize:tr?17:24};});
+  echarts.init(document.getElementById('d_sc')).setOption({grid:{left:90,right:34,top:14,bottom:48},tooltip:{formatter:p=>`${p.data.name}<br/>市值 ~$${p.data.value[0]}B<br/>敞口：${E[p.data.value[1]]||''}`},xAxis:{type:'log',name:'市值$B(log)',nameLocation:'middle',nameGap:32,min:0.05,max:300,...AX},yAxis:{type:'value',min:0.5,max:4.5,interval:1,axisLabel:{formatter:v=>E[v]||'',color:'#6b655c'},axisLine:{lineStyle:{color:'#cbbfa6'}},splitLine:{lineStyle:{color:'#ece6d8'}}},series:[{type:'scatter',data:pts,label:{show:true,formatter:'{b}',position:'top',fontSize:11,fontWeight:'bold',color:INK}}]});}
+ if(d.sankey) echarts.init(document.getElementById('d_sk')).setOption({tooltip:{trigger:'item'},series:[{type:'sankey',left:6,right:130,top:10,bottom:10,nodeWidth:14,nodeGap:12,label:{fontSize:11,color:'#3a352d'},data:d.sankey.nodes,links:d.sankey.links,lineStyle:{color:'gradient',opacity:.4},levels:(d.sankey.levels||[]).map(l=>({depth:l.depth,itemStyle:{color:l.color}}))}]});
+ if(d.portfolio) echarts.init(document.getElementById('d_pf')).setOption({tooltip:{trigger:'item',formatter:'{b}: {c}%'},legend:{bottom:0,textStyle:{fontSize:10,color:'#6b655c'}},series:[{type:'pie',radius:['38%','64%'],center:['50%','44%'],data:d.portfolio.items.map(p=>({name:p[0],value:p[1]})),label:{formatter:'{b} {c}%',fontSize:10,color:INK},itemStyle:{borderColor:'#faf8f3',borderWidth:2},color:[OX,'#a8483a','#c07a5a',GB,'#9a7b1f','#cbbfa6','#e7dfcc']}]});
+}catch(_e){console.warn('dashboard 渲染跳过（数据/库异常，不影响正文与其它图）:',_e);}})();
+
+/* ===== 编辑风产业链图 ===== */
+function buildChain(c){
+ const rows=(c.layers||[]).map(l=>{
+  const runs=l.p.map(x=>{const[nm,nat,pv,sh,tk]=x;return `<span class="pl ${sh?'sh':''}"><span class="sup ${NATCLS[nat]}">${SYM[nat]||''}</span>${nm}${tk?` <span class="tk">${tk}</span>`:''}${pv?'<span class="pv">私</span>':''}</span>`;}).join('<span class="sep">·</span>');
+  const note=l.note?`<span class="note">▸ ${l.note}</span>`:'';
+  const cls=l.ch>=5?'bn':l.ch>=4?'hi':'';
+  return `<div class="clayer ${cls}"><div class="num">${l.n}</div><div><div class="lname">${l.name}<span class="stars">${stars(l.ch)}</span></div><div class="ldef">${l.def}</div><div class="plist">${runs}${note}</div></div></div>`;
+ }).join('');
+ const lg=`<div class="chain-legend"><span><span class="sup natus">◆</span>美国</span><span><span class="sup nateu">●</span>日韩欧</span><span><span class="sup natcn">▲</span>中国</span><span><span class="sup natres">◇</span>资源国</span><span><span class="sup natgate">■</span>支付/监管</span><span><span class="sh">紫苏叶</span> 隐形瓶颈</span><span>★ 卡脖子(满5)</span></div>`;
+ return `<figure class="vizfig">${figHead(Object.assign({},c,{cap:c.cap||c.lead}),'')}<div class="chain-fig">${rows}${lg}</div>${figFoot(c)}</figure>`;
+}
+
+/* ===== 价值传导富渲染（保全部内容，非裸桑基）===== */
+function buildValueflow(c){
+ const src=(c.sources||[]).map(s=>{const d=s.detail||s.def||s.note||s.text||'';return `<div class="s"><b>${s.name}</b>${d?(' — '+d):''}</div>`;}).join('');
+ const main=(c.mainflow||[]).map((l,i)=>{
+  const cls=l.pool?'pool':(i===0?'tuna':'');
+  const players=((l.players||[]).map(p=>p).join('<span class="dot">·</span>'))||(l.text||l.detail||'');
+  const key=l.key?`<div class="key">⭐ ${l.key}</div>`:'';
+  const note=l.flownote?`<div class="vf-flownote">▼ ${l.flownote}</div>`:'';
+  const star=l.grade?` <span style="color:#c9a227;font-size:11px">${'★'.repeat(l.grade)}</span>`:'';
+  return `<div class="vf-layer ${cls}"><div class="lh"><span class="id">${l.id||''}</span><span class="nm">${l.name}</span>${l.nature?`<span class="nat">${l.nature}</span>`:''}${star}${l.annot?`<span class="annot">◄ ${l.annot}</span>`:''}</div><div class="pl">${players}</div>${key}</div>${note}`;
+ }).join('');
+ const par=(c.parallel||[]).map(l=>{
+  const star=l.grade?` <span style="color:#c9a227;font-size:11px">${'★'.repeat(l.grade)}</span>`:'';
+  return `<div class="vf-layer"><div class="lh"><span class="id">${l.id||''}</span><span class="nm">${l.name}</span>${star}${l.annot?`<span class="annot">◄ ${l.annot}</span>`:''}</div><div class="pl">${l.detail||l.text||''}</div></div>`;
+ }).join('');
+ const pools=(c.pools||[]).map(p=>`<div class="vf-pool"><span class="pn">${p.n||p.name||''}</span><span class="pt">${p.text||p.detail||''}</span>${p.grade?`<span class="pg">${'★'.repeat(p.grade)}</span>`:''}</div>`).join('');
+ const take=c.takeaway?`<div class="vf-take"><b>一句话：</b>${c.takeaway}</div>`:'';
+ return `<figure class="vizfig">${figHead(c,'')}<div class="vf">`
+  +(src?`<div class="vf-h">资金源头</div><div class="vf-src">${src}</div><div class="vf-conn">╲ ╲ ╲  注入  ▼</div>`:'')
+  +(main?`<div class="vf-h">主链 · 利润沉淀</div>${main}`:'')
+  +(par?`<div class="vf-div">平行流 · 与主链并行</div>${par}`:'')
+  +(pools?`<div class="vf-div">⭐ 钱最终沉淀在哪 · 4 个利润池</div><div class="vf-pools">${pools}</div>`:'')
+  +take+`</div>${figFoot(c)}</figure>`;
+}
+
+/* ===== 卖方级图表描述：标题 + 结论式副标题 + 数据源脚注（V2.6 全图共用）===== */
+function figHead(c,defCap){c=c||{};const cap=c.cap||defCap||'';const sub=c.subcap?`<div class="vfig-sub">${c.subcap}</div>`:'';return `<figcaption>${cap}</figcaption>${sub}`;}
+function figFoot(c){c=c||{};const hint=c.readhint?`<span class="vfig-hint">读图 ${c.readhint}</span>`:'';const src=(c.source||c.asof)?`<span class="vfig-src">数据源 ${c.source||'→需补'}${c.asof?(' · 截至 '+c.asof):''}</span>`:'';return (hint||src)?`<div class="vfig-foot">${hint}${src}</div>`:'';}
+
+/* ===== 通用 ECharts 内联图 ===== */
+function chartFigure(c,defCap,id,h){return `<figure class="vizfig">${figHead(c,defCap)}<div id="${id}" class="vchart" style="height:${h}px"></div>${figFoot(c)}</figure>`;}
+function renderGeo(el,c){const id=el.id+'_v';
+ /* V2.20.1 治本：兼容两种 schema —— 玩家模式 {players:[...]}（块=玩家数）或份额模式 {value,note}（块=份额%，无 players 时自动走此路，根除"data 有 5 国却 0 面积空白"）*/
+ const cos=c.countries||[];const hasPlayers=cos.some(co=>(co.players||[]).length);
+ el.outerHTML=chartFigure(c,hasPlayers?'国别玩家分布（块面积 = 该国玩家数 / 集中度）':'国别分布（块面积 = 份额 / 集中度）',id,460);
+ const data=hasPlayers
+  ? cos.map(co=>{const pl=co.players||[];const share=Number(co.value);const cv=(isFinite(share)&&pl.length)?share/pl.length:1;/* 有 value 则按份额定块大小、玩家均分该国块；无 value 则块=玩家数 */return {name:stripFlag(co.name),itemStyle:{color:co.color},_note:co.note||'',children:pl.map(p=>({name:p,value:cv}))};})
+  : cos.map(co=>({name:stripFlag(co.name),value:(Number(co.value)||1),itemStyle:{color:co.color},_note:co.note||''}));
+ echarts.init(document.getElementById(id)).setOption({tooltip:{formatter:p=>p.name+(p.data&&p.data._note?('<br/>'+p.data._note):'')},series:[{type:'treemap',roam:false,nodeClick:false,breadcrumb:{show:false},width:'100%',height:'100%',
+  label:{fontSize:12,color:'#fff',overflow:'breakAll',formatter:p=>(!hasPlayers&&p.data&&p.data.value!=null)?(p.name+'  '+p.data.value):p.name},
+  /* 国别标题：白字 + 深色 pill 底，浅色背景下也清晰可读 */
+  upperLabel:{show:true,height:28,color:'#fff',fontWeight:'bold',fontSize:13,backgroundColor:'rgba(28,24,20,0.66)',padding:[4,9],borderRadius:2,align:'left'},
+  itemStyle:{borderColor:'#faf8f3',borderWidth:2,gapWidth:2},
+  levels:[{itemStyle:{borderWidth:0,gapWidth:5},upperLabel:{show:false}},{itemStyle:{gapWidth:1},upperLabel:{show:true}}],data:data}]});}
+function renderBubble(el,c){const id=el.id+'_v';
+ /* 图例 + 象限标签可选覆盖（industry 默认估值口径；manifesto/author 传自己的确信度口径）*/
+ const legend=(c.legend!==undefined)?c.legend:'<span style="color:#8c2f23">◆底仓</span> <span style="color:#c0392b">●不可买</span> <span style="color:#1e7e4f">○近纯微盘</span> <span style="color:#b8860b">🌿紫苏叶</span>';
+ el.outerHTML=chartFigure(Object.assign({},c,{cap:(c.cap||'估值气泡图')+(legend?' &nbsp;·&nbsp; '+legend:'')}),null,id,440);
+ const TYC={'◆':OX,'●':'#c0392b','○':'#1e7e4f','🌿':GB};
+ const pts=(c.points||[]).map(p=>({name:p.name,value:[p.x,p.y],symbolSize:p.size||22,itemStyle:{color:TYC[p.type]||CLAY,opacity:.85},label:{show:true,formatter:p.name,position:'right',fontSize:11,color:INK}}));
+ const quad=c.quads||[{value:[0.6,2.6],t:'贵 · 但不命门'},{value:[2.4,2.6],t:'又贵又命门'},{value:[0.6,0.4],t:'便宜 · 也不命门'},{value:[2.35,0.4],t:'★ 便宜却命门 = 机会'}];
+ echarts.init(document.getElementById(id)).setOption({grid:{left:64,right:158,top:24,bottom:48},
+  tooltip:{formatter:p=>p.data.name?p.data.name:''},
+  xAxis:{name:c.xLabel||'不可或缺度 →（命门）',nameLocation:'middle',nameGap:30,min:0,max:3,axisLabel:{show:false},...AX},
+  yAxis:{name:c.yLabel||'估值 / 关注度 ↑',nameLocation:'middle',nameGap:24,nameRotate:90,min:0,max:3,axisLabel:{show:false},...AX},
+  series:[
+   {type:'scatter',data:pts,markLine:{silent:true,symbol:'none',label:{show:false},lineStyle:{color:'#d8cdb4',type:'dashed'},data:[{xAxis:1.5},{yAxis:1.5}]}},
+   {type:'scatter',symbolSize:0,silent:true,data:quad.map(q=>({value:q.value,label:{show:true,formatter:q.t,color:q.t[0]==='★'?'#9a7b1f':'#bcae93',fontSize:11,fontWeight:q.t[0]==='★'?'bold':'normal'}}))}
+  ]});}
+
+/* ===== 生命周期 × 卡脖子定位矩阵（A.2）===== */
+function renderLifecycle(el,c){
+ const cols=c.cols||[];
+ const tint=['rgba(140,47,35,.13)','rgba(154,123,31,.11)','rgba(107,101,92,.07)','rgba(168,158,140,.05)'];
+ const hdr=['#8c2f23','#9a7b1f','#7a746a','#a89e8c'];
+ let h='<figure class="vizfig">'+figHead(c,'生命周期 × 卡脖子定位矩阵');
+ h+='<div class="lcm" style="grid-template-columns:118px repeat('+cols.length+',1fr)">';
+ h+='<div class="lc-corner">生命周期 ＼ 卡脖子</div>';
+ cols.forEach((cl,i)=>h+='<div class="lc-h" style="background:'+(hdr[i]||hdr[hdr.length-1])+'">'+cl+'</div>');
+ (c.rows||[]).forEach(r=>{
+  h+='<div class="lc-row">'+r.stage+'</div>';
+  (r.cells||[]).forEach((cell,i)=>{
+   const items=(cell||[]).filter(Boolean);
+   h+='<div class="lc-cell" style="background:'+(tint[i]||tint[tint.length-1])+'">'+(items.length?items.map(x=>'<span class="lc-chip">'+x+'</span>').join(''):'<span class="lc-dash">—</span>')+'</div>';
+  });
+ });
+ h+='</div>'+figFoot(c)+'</figure>';el.outerHTML=h;
+}
+
+/* ===== A线 manifesto/author 新增渲染器（timeline / scorecard / gauge / network）===== */
+function renderTimeline(el,c){const items=(c.items||[]).map(it=>`<div class="tl-it ${it.up?'up':''}"><span class="d">${it.date||''}</span>${it.tag?`<span class="tag">${it.tag}</span>`:''}<div class="t">${it.title||''}</div>${it.detail?`<div class="x">${it.detail}</div>`:''}</div>`).join('');el.outerHTML=`<figure class="vizfig">${figHead(c,'时间线')}<div class="tl">${items}</div>${figFoot(c)}</figure>`;}
+function renderScorecard(el,c){const IC={hit:['hit','✓'],miss:['miss','✗'],part:['part','~'],partial:['part','~']};const rows=(c.items||[]).map(it=>{const o=IC[it.outcome]||['part','~'];return `<div class="row"><span class="ic ${o[0]}">${o[1]}</span><span class="dt">${it.date||''}</span><span class="pr"><b>${it.pred||''}</b>${it.note?`<span class="nt">${it.note}</span>`:''}</span></div>`;}).join('');el.outerHTML=`<figure class="vizfig">${figHead(c,'历史预测命中率')}<div class="scard"><div class="hr"><span class="big">${c.hitrate||''}</span><span class="lb">${c.note||'命中率（Claude 自动评 · 含幸存者偏差/自报/择时折扣）'}</span></div>${rows}</div>${figFoot(c)}</figure>`;}
+function renderGauge(el,c){const subs=(c.subscores||[]).map(s=>{const mx=s.max||5,pct=Math.max(0,Math.min(100,Math.round((s.val/mx)*100)));return `<span class="nm">${s.name}</span><span class="bar"><i style="width:${pct}%"></i></span><span class="vv">${s.val}/${mx}</span>`;}).join('');el.outerHTML=`<figure class="vizfig">${figHead(c,'评分')}<div class="gau"><div class="top"><span class="big">${c.score}</span><span class="mx">/ ${c.max||5}</span><span class="lb">${c.label||''}</span></div>${subs?`<div class="sub">${subs}</div>`:''}</div>${figFoot(c)}</figure>`;}
+function renderNetwork(el,c){const id=el.id+'_v';el.outerHTML=chartFigure(c,'关联思想圈',id,400);const groups=[...new Set((c.nodes||[]).map(n=>n.group||'其他'))];const pal=[OX,'#1e7e4f',GB,'#3a6ea5','#6d4c9a','#a89e8c'];echarts.init(document.getElementById(id)).setOption({tooltip:{},legend:{bottom:0,textStyle:{fontSize:10,color:'#6b655c'},data:groups},series:[{type:'graph',layout:'force',roam:true,label:{show:true,fontSize:11,color:'#3a352d'},force:{repulsion:130,edgeLength:80},categories:groups.map(g=>({name:g})),data:(c.nodes||[]).map(n=>({name:n.name,category:groups.indexOf(n.group||'其他'),symbolSize:n.size||24,itemStyle:{color:pal[groups.indexOf(n.group||'其他')%pal.length]}})),links:(c.links||[]).map(l=>({source:l.source,target:l.target})),lineStyle:{color:'#cbbfa6',width:1.2,curveness:0.08}}]});}
+
+/* ===== industry 双轴定位：生命周期 S 曲线 × 周期相位（纯 SVG 编辑卡）===== */
+function renderCycle(el,c){
+ const sec=c.secular||{},cyc=c.cyclical||{},sig=c.signals||{};
+ const sp=Math.max(0,Math.min(1,sec.pos!=null?sec.pos:0.5));
+ const cp=Math.max(0,Math.min(1,cyc.pos!=null?cyc.pos:0.5));
+ const W=320;
+ /* ① 生命周期 S 曲线（logistic，左低右高）*/
+ const sy=t=>58-(1/(1+Math.exp(-11*(t-0.5))))*48;
+ let spath='';for(let i=0;i<=48;i++){const t=i/48;spath+=(i?'L':'M')+(t*W).toFixed(1)+' '+sy(t).toFixed(1)+' ';}
+ const ST=[['萌芽',0.125],['成长',0.375],['成熟',0.625],['衰退',0.875]];
+ const sticks=ST.map(s=>`<text x="${(s[1]*W).toFixed(0)}" y="65" text-anchor="middle" font-size="9" fill="#a89e8c">${s[0]}</text>`).join('');
+ /* A3 轨迹：上期→当前（空心=上期、实心=当前），示意移动方向 */
+ const traj=(prev,cur,yf,color)=>{if(prev==null||!isFinite(prev))return '';const x1=(prev*W),y1=yf(prev);return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)} L${(cur*W).toFixed(1)} ${yf(cur).toFixed(1)}" stroke="${color}" stroke-width="2" opacity=".5"/><circle cx="${x1.toFixed(1)}" cy="${y1.toFixed(1)}" r="3" fill="#faf8f3" stroke="${color}" stroke-width="1.5"/>`;};
+ const sdot=`<circle cx="${(sp*W).toFixed(1)}" cy="${sy(sp).toFixed(1)}" r="5" fill="${OX}" stroke="#faf8f3" stroke-width="2"/>`;
+ const svgS=`<svg viewBox="0 0 ${W} 70"><path d="${spath}" fill="none" stroke="#cbbfa6" stroke-width="2"/>${traj(sec.prevPos,sp,sy,OX)}${sdot}${sticks}</svg>`;
+ /* ② 周期相位正弦（t=0 触底 → 0.5 见顶 → 1 触底）*/
+ const cyv=t=>35+22*Math.cos(2*Math.PI*t);
+ let cpath='';for(let i=0;i<=64;i++){const t=i/64;cpath+=(i?'L':'M')+(t*W).toFixed(1)+' '+cyv(t).toFixed(1)+' ';}
+ const PH=[['触底',0.0],['扩张',0.25],['见顶',0.5],['收缩',0.75]];
+ const cticks=PH.map(p=>`<text x="${(p[1]*W).toFixed(0)}" y="65" text-anchor="${p[1]===0?'start':'middle'}" font-size="9" fill="#a89e8c">${p[0]}</text>`).join('');
+ const cdot=`<circle cx="${(cp*W).toFixed(1)}" cy="${cyv(cp).toFixed(1)}" r="5" fill="${GO}" stroke="#faf8f3" stroke-width="2"/>`;
+ const svgC=`<svg viewBox="0 0 ${W} 70"><path d="${cpath}" fill="none" stroke="#cbbfa6" stroke-width="2"/>${traj(cyc.prevPos,cp,cyv,GO)}${cdot}${cticks}</svg>`;
+ const col=(cls,h,arr)=>`<div class="col ${cls}"><h5>${h}</h5><ul>${((arr&&arr.length)?arr:['→需补']).map(x=>`<li>${x}</li>`).join('')}</ul></div>`;
+ const basis=c.basis?`<div class="cyc-basis"><b>判断依据：</b>${c.basis}</div>`:'';
+ const bm=c.benchmark?`<div class="cyc-bm"><b>历史对标：</b>${c.benchmark}</div>`:'';
+ const syn=c.synthesis?`<div class="cyc-syn">▶ 证据链：${c.synthesis}</div>`:'';
+ const cc=Object.assign({readhint:'横看结构（S曲线）、纵看周期（正弦）；空心点=上期、实心点=当前'},c);
+ el.outerHTML=`<figure class="vizfig">${figHead(cc,'双轴定位 · 生命周期 × 周期相位')}<div class="cyc">`
+  +`<div class="cyc-ax"><div class="cyc-lbl">① 生命周期（结构性）· 当前 <b>${sec.stage||'—'}</b>${sec.note?' · '+sec.note:''}</div>${svgS}</div>`
+  +`<div class="cyc-ax"><div class="cyc-lbl">② 周期相位（周期性）· 主导 ${cyc.dominant||'—'} · 当前 <b>${cyc.phase||'—'}</b>${cyc.note?' · '+cyc.note:''}</div>${svgC}</div>`
+  +`<div class="cyc-sig">${col('danger','⚠ 危险信号（→见顶/反转）',sig.danger)}${col('safe','✓ 安全信号（扩张可持续）',sig.safe)}${col('watch','◉ 关键观察变量',sig.watch)}</div>`
+  +basis+bm+syn+`</div>${figFoot(cc)}</figure>`;
+}
+
+/* ===== industry 周期证据层①：强度指标时序小多图（纯 SVG sparkline）===== */
+function renderTrend(el,c){
+ const inds=c.indicators||[];
+ const spark=ind=>{const a=(ind.points||ind.series||[]).filter(v=>v!=null&&isFinite(v));const W=200,H=48,n=a.length;
+  if(n<2)return '<svg viewBox="0 0 '+W+' '+H+'"><text x="6" y="26" font-size="10" fill="#a89e8c">→需补</text></svg>';
+  const rf=Number(ind.refline),vals=isFinite(rf)?a.concat([rf]):a;
+  const mn=Math.min(...vals),mx=Math.max(...vals),rg=(mx-mn)||1,x=i=>(i/(n-1))*W,y=v=>H-11-((v-mn)/rg)*(H-20);
+  let p='';for(let i=0;i<n;i++)p+=(i?'L':'M')+x(i).toFixed(1)+' '+y(a[i]).toFixed(1)+' ';
+  /* A1 参考线（现金成本 / 100% / 饱和线）*/
+  let ref='';if(isFinite(rf)){const ry=y(rf).toFixed(1);ref='<line x1="0" y1="'+ry+'" x2="'+W+'" y2="'+ry+'" stroke="#c0392b" stroke-width="1" stroke-dasharray="3 3" opacity=".55"/><text x="'+W+'" y="'+(y(rf)-2).toFixed(1)+'" text-anchor="end" font-size="7.5" fill="#c0392b">'+(ind.reflabel||('参考 '+rf))+'</text>';}
+  /* A1 拐点（内部极值 = 转向点）*/
+  let ai=0,xi=0;for(let i=1;i<n-1;i++){if(a[i]<a[ai])ai=i;if(a[i]>a[xi])xi=i;}
+  let ti=-1;if(ai>0&&ai<n-1&&a[ai]<a[0]&&a[ai]<a[n-1])ti=ai;else if(xi>0&&xi<n-1&&a[xi]>a[0]&&a[xi]>a[n-1])ti=xi;
+  const turn=ti>=0?'<circle cx="'+x(ti).toFixed(1)+'" cy="'+y(a[ti]).toFixed(1)+'" r="3" fill="#faf8f3" stroke="'+GO+'" stroke-width="2"/>':'';
+  /* A1 时间轴端点标 */
+  const pr=(ind.periods&&ind.periods.length)?[ind.periods[0],ind.periods[ind.periods.length-1]].join('-'):null;
+  const xr=(ind.xrange||pr)?String(ind.xrange||pr).split(/[–\-→~]/):null;
+  const xlab=xr&&xr.length>=2?'<text x="0" y="'+(H-1)+'" font-size="7.5" fill="#bcae93">'+xr[0]+'</text><text x="'+W+'" y="'+(H-1)+'" text-anchor="end" font-size="7.5" fill="#bcae93">'+xr[xr.length-1]+'</text>':'';
+  return '<svg viewBox="0 0 '+W+' '+H+'">'+ref+'<path d="'+p+'" fill="none" stroke="#cbbfa6" stroke-width="2"/>'+turn+'<circle cx="'+x(n-1).toFixed(1)+'" cy="'+y(a[n-1]).toFixed(1)+'" r="3.6" fill="'+OX+'"/>'+xlab+'</svg>';};
+ const DIR={'↑':'#1e7e4f','↓':'#c0392b','→':GO};
+ const cells=inds.map(ind=>{const dir=ind.dir||'→';const _arr=(ind.points||ind.series||[]).filter(v=>v!=null&&isFinite(v));const _last=_arr.length?_arr[_arr.length-1]:null;const latest=ind.latest!=null?ind.latest:_last;return `<div class="tr-cell"><div class="tr-nm">${ind.name||''}</div>${spark(ind)}<div class="tr-foot"><span class="tr-val">${latest!=null?latest:'→需补'}${(latest!=null&&ind.unit)?ind.unit:''}</span><span class="tr-dir" style="color:${DIR[dir]||GO}">${dir}</span></div>${ind.note?`<div class="tr-note">${ind.note}</div>`:''}</div>`;}).join('');
+ const cc=Object.assign({readhint:'每格一指标：灰线=时序 · 实心点=最新 · 空心点=拐点 · 红虚线=参考/阈值 · 底标起止年'},c);
+ el.outerHTML=`<figure class="vizfig">${figHead(cc,'强度指标时序 · 周期证据层')}<div class="tr">${cells}</div>${figFoot(cc)}</figure>`;
+}
+
+/* ===== industry 周期证据层②：当前 vs 历史泡沫阈值对标条 ===== */
+function renderBenchbar(el,c){
+ const rows=(c.items||[]).map(it=>{
+  const cur=Number(it.current),dg=Number(it.danger),anl=Number(it.analog),okCur=isFinite(cur);
+  const refs=[cur,dg,anl].filter(isFinite),max=refs.length?Math.max.apply(null,refs)*1.18:1;
+  const pct=v=>Math.max(0,Math.min(100,(v/max)*100));
+  /* A2 方向：up=越高越危险 / down=越低越危险；safe 优先显式给 */
+  const dir=it.dir||(isFinite(dg)?(dg>=cur?'up':'down'):'up');
+  let safe=it.safe;if(safe==null&&isFinite(dg))safe=(dir==='up')?(cur<dg):(cur>dg);if(safe==null)safe=true;
+  const bc=safe?'#1e7e4f':'#c0392b';
+  const curTxt=okCur?(cur+(it.unit||'')):'→需补';
+  const dirHint=dir==='down'?'↓越低越危险':'↑越高越危险';
+  const curBar=okCur?`<div class="bb-fill" style="width:${Math.max(2,pct(cur)).toFixed(1)}%;background:${bc}"></div>`:'';
+  const anMark=isFinite(anl)?`<div class="bb-anmark" style="left:${pct(anl).toFixed(1)}%"></div>`:'';
+  const thr=isFinite(dg)?`<div class="bb-thr" style="left:${pct(dg).toFixed(1)}%"></div>`:'';
+  const refTxt=[isFinite(anl)?`<span class="bb-ref">◆对标 ${anl}${it.unit||''}</span>`:'',isFinite(dg)?`<span class="bb-dg">┊阈值 ${dg}${it.unit||''}</span>`:''].filter(Boolean).join('　');
+  return `<div class="bb-row"><div class="bb-nm">${it.name||''}<span class="bb-dir">${dirHint}</span></div><div class="bb-track">${curBar}${anMark}${thr}</div><div class="bb-val"><b style="color:${bc}">${curTxt}</b>${refTxt?`<span class="bb-refline">${refTxt}</span>`:''}</div>${it.note?`<div class="bb-note">▸ ${it.note}</div>`:''}</div>`;
+ }).join('');
+ const an=c.analog?`<div class="bb-an">对标基准：<b>${c.analog}</b> · 条=当前值（绿安全/红风险）· ◆=历史对标水平 · ┊=危险阈值</div>`:'';
+ const cc=Object.assign({readhint:'每行 当前值 vs ◆历史对标 vs ┊危险阈值，看安全边际还剩多少'},c);
+ el.outerHTML=`<figure class="vizfig">${figHead(cc,'当前 vs 历史泡沫 · 关键比率对标')}<div class="bb">${an}${rows}</div>${figFoot(cc)}</figure>`;
+}
+
+/* ===== V2.7.1 通用解剖渲染原型库 =====================================
+   设计：data 驱动 + 可扩展原型 + path 逃生舱，服务任意技术类型（HBM/显卡/光模块/机器人/电池/天线…）。
+   ── BOARD_SHELL[shape](BW,BH)：原型外壳，画该原型的示意轮廓+特征（一眼认出，非工程精确）。
+   ── PART_GLYPH[shape](px,py,pw,ph,fill,p)：部件图元，画有辨识度的器件符号；fill 一律 = gcol(grade)（色深=卡脖子度）。
+   逃生舱：board.path / parts[].path 直接给自定义轮廓 d 值 → 库里没有的物体无需改代码。
+   三重缺省回退（零回归）：board.shape 缺→扁平 ab-bg 底板；parts[].shape 缺→rect 图元；parts 缺坐标→只出图例表。*/
+const _f1=v=>Number(v).toFixed(1);
+/* 原型外壳库：返回外壳 SVG（不含部件）。每个示意级即可。*/
+const BOARD_SHELL={
+ /* PCB：板轮廓 + 底边金手指齿 + 四角安装孔 + 内缩丝印边框 + 几条示意走线 */
+ pcb(W,H){const gn=Math.max(5,Math.round(W/26)),gw=W/(gn*2-1),gy=H-7,r=Math.min(7,Math.round(Math.min(W,H)/10));
+  let g='';for(let i=0;i<gn;i++){const gx=i*gw*2;g+=`<rect class="ab-metal" x="${_f1(gx)}" y="${_f1(gy)}" width="${_f1(gw)}" height="7" rx="1"/>`;}
+  const m=9,hr=3.4;let holes='';[[m,m],[W-m,m],[m,H-m-7],[W-m,H-m-7]].forEach(p=>holes+=`<circle class="ab-hole" cx="${_f1(p[0])}" cy="${_f1(p[1])}" r="${hr}"/>`);
+  let tr='';for(let i=0;i<4;i++){const ty=14+i*((H-30)/3);tr+=`<path class="ab-trace" d="M14 ${_f1(ty)} H${_f1(W*0.4)} V${_f1(ty+9)} H${_f1(W-16)}"/>`;}
+  return `<rect class="ab-shell" x="0" y="0" width="${_f1(W)}" height="${_f1(H)}" rx="${r}"/>`
+   +`<rect class="ab-edge-d" x="6" y="6" width="${_f1(W-12)}" height="${_f1(H-13)}" rx="${Math.max(2,r-3)}"/>`+tr+g+holes;},
+ /* STACK：芯片叠层侧剖面 = 一摞带厚度/分隔缝的水平层 + 左侧贯穿 TSV 竖线（部件另由 section 布局叠放）*/
+ stack(W,H){const r=4,n=5;let layers='';for(let i=0;i<n;i++){const ly=6+i*((H-12)/n),lh=(H-12)/n;
+   layers+=`<rect class="ab-shell2" x="10" y="${_f1(ly)}" width="${_f1(W-20)}" height="${_f1(lh-1.5)}" rx="1.5"/>`;}
+  const tsv=`<line class="ab-tsv" x1="20" y1="6" x2="20" y2="${_f1(H-6)}"/><line class="ab-tsv" x1="${_f1(W-20)}" y1="6" x2="${_f1(W-20)}" y2="${_f1(H-6)}"/>`;
+  return `<rect class="ab-shell" x="0" y="0" width="${_f1(W)}" height="${_f1(H)}" rx="${r}"/>${layers}${tsv}`;},
+ /* MODULE：金属外壳 + 左侧光口圆 + 法兰螺孔 */
+ module(W,H){const r=16;const cy=H/2,pr=Math.min(13,H*0.16);
+  let scr='';[[12,12],[W-12,12],[12,H-12],[W-12,H-12]].forEach(p=>scr+=`<circle class="ab-hole" cx="${_f1(p[0])}" cy="${_f1(p[1])}" r="2.6"/>`);
+  const port=`<circle class="ab-metal" cx="14" cy="${_f1(cy)}" r="${_f1(pr)}"/><circle class="ab-hole" cx="14" cy="${_f1(cy)}" r="${_f1(pr*0.5)}"/>`;
+  return `<rect class="ab-shell" x="0" y="0" width="${_f1(W)}" height="${_f1(H)}" rx="${r}"/>`
+   +`<rect class="ab-edge-d" x="7" y="7" width="${_f1(W-14)}" height="${_f1(H-14)}" rx="${r-5}"/>${scr}${port}`;},
+ /* MECH：机械件剖面 = 外壳轮廓 + 中心轴/转子示意 + 端盖缝 */
+ mech(W,H){const r=10,cx=W/2,cy=H/2,ro=Math.min(W,H)*0.34,ri=ro*0.4;
+  return `<rect class="ab-shell" x="0" y="0" width="${_f1(W)}" height="${_f1(H)}" rx="${r}"/>`
+   +`<line class="ab-edge" x1="${_f1(W*0.18)}" y1="6" x2="${_f1(W*0.18)}" y2="${_f1(H-6)}"/>`
+   +`<circle class="ab-shell2" cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(ro)}"/>`
+   +`<circle class="ab-metal" cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(ri)}"/>`
+   +`<line class="ab-edge" x1="${_f1(cx)}" y1="${_f1(cy-ro)}" x2="${_f1(cx)}" y2="${_f1(cy+ro)}"/>`;},
+ /* DIE：芯片裸晶 floorplan = 外框 + 网格分区底纹 + 内缩 seal-ring */
+ die(W,H){const r=3,step=Math.max(18,Math.round(W/8));let grid='';
+  for(let gx=step;gx<W;gx+=step)grid+=`<line class="ab-glyph-ln" x1="${_f1(gx)}" y1="4" x2="${_f1(gx)}" y2="${_f1(H-4)}"/>`;
+  for(let gy=step;gy<H;gy+=step)grid+=`<line class="ab-glyph-ln" x1="4" y1="${_f1(gy)}" x2="${_f1(W-4)}" y2="${_f1(gy)}"/>`;
+  return `<rect class="ab-shell2" x="0" y="0" width="${_f1(W)}" height="${_f1(H)}" rx="${r}"/>`
+   +`<rect class="ab-edge" x="5" y="5" width="${_f1(W-10)}" height="${_f1(H-10)}" rx="2"/>${grid}`;}
+};
+/* 部件图元库：返回部件 SVG（轮廓+内部特征），fill=gcol(grade)。rect=现状兜底。*/
+const PART_GLYPH={
+ rect(x,y,w,h,fill){return `<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="3" fill="${fill}" fill-opacity=".88"/>`;},
+ /* chip：黑体 + 四边引脚短线 + pin-1 角点 */
+ chip(x,y,w,h,fill){const np=Math.max(2,Math.min(5,Math.round(w/12))),sp=w/(np+1),L=4;let pins='';
+  for(let i=1;i<=np;i++){const px=x+sp*i;pins+=`<line class="ab-pin" x1="${_f1(px)}" y1="${_f1(y)}" x2="${_f1(px)}" y2="${_f1(y-L)}"/><line class="ab-pin" x1="${_f1(px)}" y1="${_f1(y+h)}" x2="${_f1(px)}" y2="${_f1(y+h+L)}"/>`;}
+  const nv=Math.max(2,Math.min(5,Math.round(h/12))),vp=h/(nv+1);
+  for(let i=1;i<=nv;i++){const py=y+vp*i;pins+=`<line class="ab-pin" x1="${_f1(x)}" y1="${_f1(py)}" x2="${_f1(x-L)}" y2="${_f1(py)}"/><line class="ab-pin" x1="${_f1(x+w)}" y1="${_f1(py)}" x2="${_f1(x+w+L)}" y2="${_f1(py)}"/>`;}
+  return pins+`<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="2" fill="${fill}" fill-opacity=".9"/>`
+   +`<circle class="ab-pin1" cx="${_f1(x+4)}" cy="${_f1(y+4)}" r="1.7"/>`;},
+ /* die：裸晶 + 对角划片纹 */
+ die(x,y,w,h,fill){return `<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="1.5" fill="${fill}" fill-opacity=".9"/>`
+  +`<line class="ab-glyph-ln" x1="${_f1(x)}" y1="${_f1(y)}" x2="${_f1(x+w)}" y2="${_f1(y+h)}"/><line class="ab-glyph-ln" x1="${_f1(x+w)}" y1="${_f1(y)}" x2="${_f1(x)}" y2="${_f1(y+h)}"/>`;},
+ /* connector：金手指齿 / 插针阵列 */
+ connector(x,y,w,h,fill){const n=Math.max(3,Math.round(w/7)),fw=w/(n*1.6);let f='';
+  for(let i=0;i<n;i++){const fx=x+i*(w/n)+ (w/n-fw)/2;f+=`<rect x="${_f1(fx)}" y="${_f1(y)}" width="${_f1(fw)}" height="${_f1(h)}" rx="1" fill="${fill}" fill-opacity=".92"/>`;}
+  return `<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="1" fill="none" stroke="${fill}" stroke-width="1" opacity=".5"/>${f}`;},
+ /* heatsink：竖鳍片排 */
+ heatsink(x,y,w,h,fill){const n=Math.max(3,Math.round(w/6)),fw=w/(n*1.8);let f='';
+  for(let i=0;i<n;i++){const fx=x+i*(w/n);f+=`<rect x="${_f1(fx)}" y="${_f1(y)}" width="${_f1(fw)}" height="${_f1(h)}" rx="1" fill="${fill}" fill-opacity=".82"/>`;}
+  return f+`<rect x="${_f1(x)}" y="${_f1(y+h-3)}" width="${_f1(w)}" height="3" fill="${fill}" fill-opacity=".95"/>`;},
+ /* capacitor：圆柱 + 极性条 */
+ capacitor(x,y,w,h,fill){const cx=x+w/2;return `<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="${_f1(Math.min(w,h)/2.4)}" fill="${fill}" fill-opacity=".88"/>`
+  +`<ellipse cx="${_f1(cx)}" cy="${_f1(y+3)}" rx="${_f1(w/2-1)}" ry="2.2" fill="none" class="ab-glyph-ln"/>`
+  +`<rect x="${_f1(x+1.5)}" y="${_f1(y+3)}" width="2.4" height="${_f1(h-6)}" fill="var(--paper2)" opacity=".75"/>`;},
+ /* coil：线圈 / 绕组弧线（电机/电感）*/
+ coil(x,y,w,h,fill){const cx=x+w/2,cy=y+h/2,n=Math.max(3,Math.round(w/9)),rw=w/(n+1);let arcs='';
+  for(let i=0;i<n;i++){const ax=x+rw*(i+0.7);arcs+=`<ellipse cx="${_f1(ax)}" cy="${_f1(cy)}" rx="${_f1(rw*0.55)}" ry="${_f1(h/2-1.5)}" fill="none" stroke="${fill}" stroke-width="1.6" opacity=".82"/>`;}
+  return `<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="3" fill="${fill}" fill-opacity=".14"/>${arcs}`;},
+ /* gear：齿轮（机械）*/
+ gear(x,y,w,h,fill){const cx=x+w/2,cy=y+h/2,R=Math.min(w,h)/2-1,nt=10;let teeth='';
+  for(let i=0;i<nt;i++){const a=(i/nt)*2*Math.PI,a2=a+Math.PI/nt*0.55;
+   teeth+=`<line x1="${_f1(cx+Math.cos(a)*R*0.82)}" y1="${_f1(cy+Math.sin(a)*R*0.82)}" x2="${_f1(cx+Math.cos(a2)*R)}" y2="${_f1(cy+Math.sin(a2)*R)}" stroke="${fill}" stroke-width="2.4" stroke-linecap="round"/>`;}
+  return teeth+`<circle cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R*0.78)}" fill="${fill}" fill-opacity=".88"/><circle cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R*0.3)}" fill="var(--paper2)"/>`;},
+ /* cell：电芯（电池）+ 正极柱 */
+ cell(x,y,w,h,fill){return `<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="2.5" fill="${fill}" fill-opacity=".88"/>`
+  +`<rect x="${_f1(x+w/2-3)}" y="${_f1(y-2.5)}" width="6" height="3" rx="1" fill="${fill}"/>`
+  +`<line class="ab-glyph-ln" x1="${_f1(x+3)}" y1="${_f1(y+h/2)}" x2="${_f1(x+w-3)}" y2="${_f1(y+h/2)}"/>`;},
+ /* lens：透镜 / 同心圆（光学）*/
+ lens(x,y,w,h,fill){const cx=x+w/2,cy=y+h/2,R=Math.min(w,h)/2-1;return `<circle cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R)}" fill="${fill}" fill-opacity=".5"/>`
+  +`<circle cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R*0.62)}" fill="none" stroke="${fill}" stroke-width="1.4"/><circle cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R*0.28)}" fill="${fill}" fill-opacity=".95"/>`;},
+ /* port：光口同心圆（带法兰）*/
+ port(x,y,w,h,fill){const cx=x+w/2,cy=y+h/2,R=Math.min(w,h)/2-1;return `<circle class="ab-metal" cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R)}"/>`
+  +`<circle cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R*0.55)}" fill="${fill}" fill-opacity=".9"/><circle cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R*0.22)}" fill="var(--paper2)"/>`;},
+ /* stack-layer：带厚度阴影的叠层条（叠层剖面用）*/
+ 'stack-layer'(x,y,w,h,fill){return `<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="1.5" fill="${fill}" fill-opacity=".9"/>`
+  +`<rect x="${_f1(x)}" y="${_f1(y+h-2.2)}" width="${_f1(w)}" height="2.2" fill="#000" opacity=".18"/>`
+  +`<line class="ab-glyph-ln" x1="${_f1(x)}" y1="${_f1(y+0.8)}" x2="${_f1(x+w)}" y2="${_f1(y+0.8)}"/>`;}
+};
+/* ===== techdive 实体标注解剖图：编号 callout schematic + 图例表（纯 SVG 编辑卡 + HTML 表）=====
+   部件按 grade(1-5) 用 oxblood→faint 渐变着色；ticker 以纯文本输出，复用全局 ticker→Yahoo linkify。
+   V2.7.1：升级为通用标注解剖图——BOARD_SHELL 外壳原型 + PART_GLYPH 部件图元 + path 逃生舱 + section 剖面视图 + 外置 leader-line 标注。
+   降级（零回归）：board.shape 缺→扁平 ab-bg；parts[].shape 缺→rect；parts 缺 x/y 坐标 → 只渲图例表（诚实不假装）。*/
+function renderAnatomy(c){
+ const parts=(c.parts||[]);
+ const GRADE=['#cbbfa6','#bf9a8c','#b66f5d','#a8483a','#8c2f23']; // grade 1→5: faint → oxblood
+ const tint =['rgba(203,195,182,.18)','rgba(191,154,140,.20)','rgba(182,111,93,.22)','rgba(168,72,58,.24)','rgba(140,47,35,.26)'];
+ const gcol=g=>{const i=Math.max(1,Math.min(5,Number(g)||1))-1;return GRADE[i];};
+ const gtint=g=>{const i=Math.max(1,Math.min(5,Number(g)||1))-1;return tint[i];};
+ const stripsec=s=>String(s==null?'':s);
+ /* ① 解剖板（SVG）— 仅当 parts 全有 x/y 坐标时绘制 */
+ const placed=parts.filter(p=>p&&isFinite(Number(p.x))&&isFinite(Number(p.y)));
+ const bd=c.board||{};
+ const section=bd.view==='section';
+ /* 是否启用任一新特性（外壳原型 / path 逃生舱 / 剖面视图 / 部件图元）——
+    ★ 零回归关键：只有显式请求新特性才走富渲染；不带任何新字段的老 anatomy JSON → legacy 分支 → 字节级不变。
+    外置 leader 标注不是触发条件：它在富渲染分支内默认开启（labels:false 可关回 on-part 徽标），
+    也可对老式 schematic 用 board.labels:true 单独点亮（不改其余渲染）。 */
+ const hasShell=!!(bd.shape||bd.path);
+ const hasGlyph=placed.some(p=>p.shape||p.path);
+ const wantLabel=(bd.labels===true)||((hasShell||hasGlyph||section)&&bd.labels!==false);
+ const enrich=hasShell||hasGlyph||section||(bd.labels===true&&placed.length);
+ let board='';
+ if(placed.length && !enrich){
+  /* ── legacy 分支（与 V2.7.0 字节级一致）── */
+  const BW=Math.max(160,Number(bd.w)||320),BH=Math.max(110,Number(bd.h)||210);
+  const round=(bd.shape==='module')?18:9;
+  const cells=placed.map(p=>{
+   const w=Math.max(4,Number(p.w)||14),h=Math.max(4,Number(p.h)||12);
+   const x=Math.max(0,Math.min(100,Number(p.x))),y=Math.max(0,Math.min(100,Number(p.y)));
+   const px=(x/100)*BW,py=(y/100)*BH,pw=(w/100)*BW,ph=(h/100)*BH;
+   const cx=px+pw/2,cy=py+ph/2;
+   const nm=String(p.name||'').slice(0,8);
+   return `<g class="ab-part">`
+    +`<rect x="${px.toFixed(1)}" y="${py.toFixed(1)}" width="${pw.toFixed(1)}" height="${ph.toFixed(1)}" rx="3" fill="${gcol(p.grade)}" fill-opacity=".88"/>`
+    +`<text class="ab-pname" x="${cx.toFixed(1)}" y="${(cy+13).toFixed(1)}">${nm}</text>`
+    +`<circle class="ab-badge" cx="${cx.toFixed(1)}" cy="${(cy-3).toFixed(1)}" r="8.5"/>`
+    +`<text class="ab-bnum" x="${cx.toFixed(1)}" y="${(cy+0.5).toFixed(1)}">${p.n!=null?p.n:''}</text>`
+    +`</g>`;
+  }).join('');
+  board=`<svg class="anat-board" viewBox="-6 -6 ${BW+12} ${BH+12}" role="img">`
+   +`<rect class="ab-bg" x="0" y="0" width="${BW}" height="${BH}" rx="${round}"/>${cells}</svg>`;
+ }else if(placed.length){
+  /* ── V2.7.1 通用富渲染分支 ── */
+  const BW=Math.max(160,Number(bd.w)||320),BH=Math.max(110,Number(bd.h)||210);
+  /* 剖面视图：按 parts 顺序把每个 part 自动堆叠成上下层（覆盖其 x/h，保留 grade/n/name）*/
+  const ABS=!section && placed.some(p=>[p.x,p.y,p.w,p.h].some(v=>Number(v)>100)); /* 坐标制式自动识别：非剖面下任一坐标>100=绝对(板内 px)，否则百分比 0-100；剖面恒按比例堆叠。作者两种写法都对 */
+  const lay=placed.map((p,i)=>{
+   let x=ABS?Number(p.x):Math.max(0,Math.min(100,Number(p.x))),y=ABS?Number(p.y):Math.max(0,Math.min(100,Number(p.y)));
+   let w=Math.max(4,Number(p.w)||14),h=Math.max(4,Number(p.h)||12);
+   if(section){const n=placed.length,gap=2,lh=(100-gap*(n+1))/n;x=8;w=84;h=lh;y=gap+(lh+gap)*i;}
+   const px=ABS?x:(x/100)*BW,py=ABS?y:(y/100)*BH,pw=ABS?w:(w/100)*BW,ph=ABS?h:(h/100)*BH;
+   return {p,px,py,pw,ph,cx:px+pw/2,cy:py+ph/2};
+  });
+  /* 外壳：path 逃生舱 > shape 查库 > section 默认 stack > 缺省扁平 ab-bg */
+  let shell;
+  if(bd.path) shell=`<path class="ab-shell" d="${bd.path}"/>`;
+  else if(bd.shape&&BOARD_SHELL[bd.shape]) shell=BOARD_SHELL[bd.shape](BW,BH);
+  else if(section) shell=BOARD_SHELL.stack(BW,BH);
+  else shell=`<rect class="ab-bg" x="0" y="0" width="${_f1(BW)}" height="${_f1(BH)}" rx="9"/>`;
+  /* 部件图元：parts[].path 逃生舱 > parts[].shape 查库 > section 默认 stack-layer > rect 兜底 */
+  const glyphs=lay.map(L=>{const p=L.p,fill=gcol(p.grade);
+   let g;
+   if(p.path) g=`<path d="${p.path}" fill="${fill}" fill-opacity=".9"/>`;
+   else{const fn=PART_GLYPH[p.shape]||(section?PART_GLYPH['stack-layer']:PART_GLYPH.rect);g=fn(L.px,L.py,L.pw,L.ph,fill,p);}
+   const nm=String(p.name||'').slice(0,9);
+   return `<g class="ab-part">${g}<text class="ab-pname" x="${_f1(L.cx)}" y="${_f1(L.cy+3)}">${nm}</text></g>`;
+  }).join('');
+  /* 外置 leader-line 标注：徽标放左/右边距 + 0.5px 虚线牵到部件；空间窄/labels:false → 回退 on-part 徽标 */
+  const M=wantLabel?64:0;  /* 左右各留 64px 标签边距 */
+  const lefts=[],rights=[];
+  if(wantLabel){
+   /* 按部件中心在左半/右半分组，组内按 y 排序，纵向均分边距槽位 */
+   lay.forEach(L=>{(L.cx<BW/2?lefts:rights).push(L);});
+   lefts.sort((a,b)=>a.cy-b.cy);rights.sort((a,b)=>a.cy-b.cy);
+  }
+  const slot=(arr,side)=>arr.map((L,i)=>{
+   const n=arr.length,sy=(BH/(n+1))*(i+1);
+   const bx=side==='L'?-M+14:BW+M-14,tx=side==='L'?-M+30:BW+M-30;
+   const p=L.p;
+   return `<line class="ab-lead" x1="${_f1(L.cx)}" y1="${_f1(L.cy)}" x2="${_f1(bx+(side==='L'?9:-9))}" y2="${_f1(sy)}"/>`
+    +`<circle class="ab-badge" cx="${_f1(bx)}" cy="${_f1(sy)}" r="8.5"/>`
+    +`<text class="ab-bnum" x="${_f1(bx)}" y="${_f1(sy+0.5)}">${p.n!=null?p.n:''}</text>`;
+  }).join('');
+  let badges;
+  if(wantLabel){badges=slot(lefts,'L')+slot(rights,'R');}
+  else{ /* on-part 徽标回退 */
+   badges=lay.map(L=>`<circle class="ab-badge" cx="${_f1(L.cx)}" cy="${_f1(L.py+9)}" r="8.5"/><text class="ab-bnum" x="${_f1(L.cx)}" y="${_f1(L.py+12.5)}">${L.p.n!=null?L.p.n:''}</text>`).join('');
+  }
+  const vbX=-6-M,vbW=BW+12+M*2;
+  board=`<svg class="anat-board" viewBox="${_f1(vbX)} -6 ${_f1(vbW)} ${BH+12}" role="img">${shell}${glyphs}${badges}</svg>`;
+ }
+ /* ★ V2.7.3 真图标注模式（image-mode）：有 `image.url`（websearch 真实权威配图：厂商/数据手册/论文图）时，
+    用真图 + 编号 callout 覆盖层替代合成 SVG——治"合成解剖图画不像真物"（如 GB200 托盘、具体封装/连接器）。
+    callouts[].n/x/y（x/y=0-100% 覆盖在图上），与下方图例表 # 一一对应；带来源出处归属、零回归（无 image 走原合成分支）。*/
+ let imgMode=false;
+ if(c.image && c.image.url){imgMode=true;
+  const im=c.image;
+  const cos=(im.callouts||[]).map(o=>`<span class="anat-co" style="left:${Math.max(0,Math.min(100,Number(o.x)||0))}%;top:${Math.max(0,Math.min(100,Number(o.y)||0))}%">${o.n!=null?o.n:''}</span>`).join('');
+  const srcName=im.source||im.source_url||'';
+  const src=srcName?`<div class="anat-imgsrc">图源：${im.source_url?`<a href="${im.source_url}" target="_blank" rel="noopener">${srcName}</a>`:srcName}${im.caption?(' · '+im.caption):''}</div>`:`<div class="anat-imgsrc">⚠ 图源→需补</div>`;
+  board=`<div class="anat-img"><img src="${im.url}" alt="${String(c.cap||'解剖图').replace(/"/g,'')}" loading="lazy">${cos}</div>${src}`;
+ }
+ /* ② 图例表（HTML）— 始终渲染（板缺坐标时这是唯一输出）*/
+ const rows=parts.map(p=>{
+  const rel=p.rel&&p.rel!=='confirmed'?`<span style="color:#999;font-size:.85em">（${p.rel==='candidate'?'送样/未确认':'仅具能力'}）</span>`:'';
+  const co=stripsec(p.co)+rel, sec=p.sec?`<span class="sec">${p.sec}</span>`:'';
+  const gr=isFinite(Number(p.grade))?`<span class="gr">${stars(Number(p.grade))}</span>`:'';
+  const link=p.link?p.link:'<span class="lg-dash">—</span>';
+  return `<tr style="background:${gtint(p.grade)}">`
+   +`<td class="lg-n">${p.n!=null?p.n:''}</td>`
+   +`<td class="lg-nm">${p.name||''}${gr}</td>`
+   +`<td>${p.fn||'<span class="lg-dash">→需补</span>'}</td>`
+   +`<td>${link}</td>`
+   +`<td class="lg-co">${co||'<span class="lg-dash">—</span>'}${sec}</td></tr>`;
+ }).join('');
+ const tbl=`<table class="anat-leg"><thead><tr><th>#</th><th>部件</th><th>功能</th><th>连接</th><th>公司</th></tr></thead><tbody>${rows}</tbody></table>`;
+ const note=c.legendnote?`<div class="anat-note">▸ ${c.legendnote}</div>`:'';
+ const cc=Object.assign({readhint:'板上编号徽标（外侧 ↔ 0.5px 虚线引线牵到部件）与下表 # 一一对应；色深=越卡脖子（grade 5→1：oxblood→faint）'+(placed.length?'':' · ⚠ 部件缺坐标，已降级为纯图例表')},c);
+ return `<figure class="vizfig">${figHead(cc,'实体标注解剖图')}<div class="anat">${board}${tbl}${note}</div>${figFoot(cc)}</figure>`;
+}
+
+/* ===== 全文 markdown 渲染（零删减）===== */
+const md=window.markdownit({html:true,linkify:false,breaks:false});
+document.getElementById('content').innerHTML=md.render(document.getElementById('md').textContent);
+document.querySelectorAll('#content h1,#content h2,#content h3').forEach(h=>{h.id=h.textContent.replace(/[\s、：·（）()\[\]/.,#]/g,'')});
+/* 表格包横向滚动容器（防溢出/竖排）*/
+document.querySelectorAll('#content table').forEach(t=>{const w=document.createElement('div');w.className='tablewrap';t.parentNode.insertBefore(w,t);w.appendChild(t);});
+/* mermaid 复活 */
+document.querySelectorAll('#content code.language-mermaid').forEach(el=>{const d=document.createElement('div');d.className='mermaid';d.textContent=el.textContent;el.closest('pre').replaceWith(d);});
+if(typeof mermaid!=='undefined'){try{mermaid.initialize({startOnLoad:false,theme:'base',themeVariables:{fontFamily:'PingFang SC,sans-serif',fontSize:'13px'},flowchart:{nodeSpacing:28,rankSpacing:32,useMaxWidth:true}});mermaid.run({querySelector:'#content .mermaid'});}catch(e){}}
+/* ASCII <pre> → 渲染图。优先读紧邻前的 <!--VIZ:KEY--> 标记（稳健，V2.5.2+）；
+   无标记则回退关键词 sentinel（兼容老报告） */
+function vizKey(pre){let n=pre.previousSibling,hop=0;while(n&&hop<4){if(n.nodeType===8){const m=/VIZ:(\w+)/.exec(n.nodeValue);if(m)return m[1];}if(n.nodeType===1)break;n=n.previousSibling;hop++;}return null;}
+function kwKey(t){if(t.includes('产业链全景'))return'chain';if(t.includes('资金流总览')||t.includes('价值传导'))return'valueflow';if(t.includes('世界分布'))return'geo';if(t.includes('不可或缺'))return'bubble';if(t.includes('Embryonic')&&t.includes('卡脖子'))return'lifecycle';return null;}
+let _vid=0;
+document.querySelectorAll('#content pre').forEach(pre=>{try{
+ const key=vizKey(pre)||kwKey(pre.textContent);
+ if(!key) return;
+ const base=key.split('_')[0], xdata=CH[key];
+ if(key==='chain' && CH.chain){const w=document.createElement('div');w.innerHTML=buildChain(CH.chain);pre.replaceWith(w.firstChild);return;}
+ if(key==='valueflow' && CH.valueflow){const w=document.createElement('div');w.innerHTML=buildValueflow(CH.valueflow);pre.replaceWith(w.firstChild);return;}
+ if(key==='anatomy' && CH.anatomy){const w=document.createElement('div');w.innerHTML=renderAnatomy(CH.anatomy);pre.replaceWith(w.firstChild);return;}
+ if(key==='geo' && CH.geo){pre.id='geo_'+(++_vid);renderGeo(pre,CH.geo);return;}
+ if(key==='bubble' && CH.bubble){pre.id='bub_'+(++_vid);renderBubble(pre,CH.bubble);return;}
+ if(key==='lifecycle' && CH.lifecycle){pre.id='lc_'+(++_vid);renderLifecycle(pre,CH.lifecycle);return;}
+ if(base==='timeline' && xdata){pre.id='v_'+(++_vid);renderTimeline(pre,xdata);return;}
+ if(base==='scorecard' && xdata){pre.id='v_'+(++_vid);renderScorecard(pre,xdata);return;}
+ if(base==='gauge' && xdata){pre.id='v_'+(++_vid);renderGauge(pre,xdata);return;}
+ if(base==='network' && xdata){pre.id='v_'+(++_vid);renderNetwork(pre,xdata);return;}
+ if(base==='cycle' && xdata){pre.id='v_'+(++_vid);renderCycle(pre,xdata);return;}
+ if(base==='trend' && xdata){pre.id='v_'+(++_vid);renderTrend(pre,xdata);return;}
+ if(base==='benchbar' && xdata){pre.id='v_'+(++_vid);renderBenchbar(pre,xdata);return;}
+}catch(_e){console.warn('viz 渲染跳过（单图异常，不影响其它）:',_e);}});
+/* A线增强：标记后无 <pre> 时，图直接插在 <!--VIZ:KEY--> 标记处（正文表格保留作零删减详情）*/
+(function(){
+ const R={geo:renderGeo,bubble:renderBubble,lifecycle:renderLifecycle,timeline:renderTimeline,scorecard:renderScorecard,gauge:renderGauge,network:renderNetwork,cycle:renderCycle,trend:renderTrend,benchbar:renderBenchbar};
+ const cw=document.createTreeWalker(document.getElementById('content'),NodeFilter.SHOW_COMMENT);
+ const nodes=[];let n;while(n=cw.nextNode())nodes.push(n);
+ nodes.forEach(node=>{try{
+  const m=/VIZ:(\w+)/.exec(node.nodeValue);if(!m)return;
+  const key=m[1],base=key.split('_')[0],data=CH[key];if(!data)return;
+  const nx=node.nextElementSibling;
+  if(nx&&nx.classList&&nx.classList.contains('vizfig'))return; // pre-loop 已渲染，跳过
+  const ph=document.createElement('div');ph.id='vp_'+(++_vid);node.parentNode.insertBefore(ph,node.nextSibling);
+  if(base==='chain'){const w=document.createElement('div');w.innerHTML=buildChain(data);ph.replaceWith(w.firstChild);}
+  else if(base==='valueflow'){const w=document.createElement('div');w.innerHTML=buildValueflow(data);ph.replaceWith(w.firstChild);}
+  else if(base==='anatomy'){const w=document.createElement('div');w.innerHTML=renderAnatomy(data);ph.replaceWith(w.firstChild);}
+  else if(R[base]) R[base](ph,data);
+  else ph.remove();
+ }catch(_e){console.warn('viz2 渲染跳过:',_e);}});
+})();
+/* ticker → Yahoo Finance 超链接（点 ticker 跳转）*/
+try{(function(){
+ const keys=Object.keys(TK).sort((a,b)=>b.length-a.length);
+ if(!keys.length) return;
+ const esc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+ const re=new RegExp('(?<![A-Za-z0-9.$])('+keys.map(esc).join('|')+')(?![A-Za-z0-9])','g');
+ const SKIP={A:1,SCRIPT:1,STYLE:1,CODE:1,PRE:1};  /* 不在已有链接 / 代码块 / ASCII pre 内 linkify */
+ const walk=document.createTreeWalker(document.getElementById('content'),NodeFilter.SHOW_TEXT,{acceptNode:n=>{
+   if(SKIP[n.parentNode.nodeName]) return NodeFilter.FILTER_REJECT;
+   return re.test(n.nodeValue)?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_SKIP;
+ }});
+ const todo=[];let n;while(n=walk.nextNode())todo.push(n);
+ todo.forEach(node=>{
+  re.lastIndex=0;
+  const frag=document.createDocumentFragment();let last=0,m;
+  while(m=re.exec(node.nodeValue)){
+   if(m.index>last)frag.appendChild(document.createTextNode(node.nodeValue.slice(last,m.index)));
+   const a=document.createElement('a');a.className='tk-link';a.href=TK[m[1]];a.target='_blank';a.rel='noopener';a.textContent=m[1];
+   frag.appendChild(a);last=m.index+m[1].length;
+  }
+  if(last<node.nodeValue.length)frag.appendChild(document.createTextNode(node.nodeValue.slice(last)));
+  node.parentNode.replaceChild(frag,node);
+ });
+})();}catch(e){/* 老浏览器无 lookbehind 时静默跳过 ticker linkify，不影响其他渲染 */}
+/* V2.7.2 ECharts 0 宽自愈（治本 CPO/关节模组 geo·bubble·dashboard 反复空白）：
+   脚本在布局完成前同步执行 echarts.init() → 容器此刻 clientWidth=0 → canvas 锁死 0 宽且 ECharts 不自动重画。
+   SVG 图（cycle/trend/benchbar）与 DOM 图（chain/valueflow）天生免疫，故只有 canvas 三件反复受害。
+   修复三重保险：load 后统一 resize + 字体就绪后 resize + 两级延迟重试（CDN/字体慢场景）+ 保留原 resize 监听。*/
+(function(){
+ function healAll(){document.querySelectorAll('.chart,.vchart,[id^=d_]').forEach(c=>{try{const i=echarts.getInstanceByDom(c);if(i&&c.clientWidth>0)i.resize();}catch(_e){}});}
+ window.addEventListener('load',()=>{healAll();setTimeout(healAll,400);setTimeout(healAll,1500);});
+ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>setTimeout(healAll,60));
+ if(document.readyState==='complete')setTimeout(healAll,0);
+ window.addEventListener('resize',healAll);
+})();
+</script></body></html>

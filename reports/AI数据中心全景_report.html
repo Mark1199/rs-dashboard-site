@@ -1,0 +1,1770 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
+<!-- industry-research 编辑风报告模板 · 共享底座 V2.7.1（industry/manifesto/author/techdive 共用） · 渲染由 scripts/render_report_html.py 注入
+     V2.7.0：纯加法新增 renderAnatomy = 实体标注解剖图（SVG schematic 编号 callout + 图例表，供 /techdive），不动任何现有渲染器
+     V2.7.1：renderAnatomy 升级为通用标注解剖图——data 驱动 + 可扩展原型库（BOARD_SHELL 外壳 ×5：pcb/stack/module/mech/die；
+             PART_GLYPH 部件图元 ×12：chip/die/connector/heatsink/capacitor/coil/gear/cell/lens/port/stack-layer/rect）
+             + path 逃生舱（board.path / parts[].path 给任意轮廓）+ board.view:"section" 剖面视图 + 外置 leader-line 标注。
+             三重缺省回退保证老 anatomy JSON 字节级不变；其余 14 个渲染器一字未动。
+     V2.7.1a：renderAnatomy 富分支加坐标制式自动识别（非剖面下任一坐标>100=绝对板内 px，否则百分比 0-100；剖面恒按比例堆叠）——
+              作者用绝对或百分比两种写法都渲染正确，few-shot 绝对坐标无需改写；百分比 JSON 行为不变（零回归）。 -->
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI数据中心全景 · 产业研究 · 编辑版</title>
+<script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+:root{
+ --paper:#faf8f3; --paper2:#f3efe5; --ink:#1c1a17; --ink2:#3a352d;
+ --muted:#6b655c; --faint:#a89e8c; --line:#e0d9cb; --line2:#cbbfa6;
+ --ox:#8c2f23; --ox2:#a8483a; --gold:#9a7b1f; --goldbar:#c9a227;
+ --serif:"Songti SC","Source Han Serif SC","Noto Serif SC","SimSun",Georgia,serif;
+ --sans:"PingFang SC","Microsoft YaHei","Segoe UI",-apple-system,sans-serif;
+}
+*{box-sizing:border-box} html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink2);font-family:var(--sans);font-size:16px;line-height:1.85;-webkit-font-smoothing:antialiased}
+.page{max-width:768px;margin:0 auto;padding:0 26px 120px}
+/* masthead */
+.masthead{padding:60px 0 30px;border-bottom:3px double var(--line2);margin-bottom:8px}
+.masthead .kick{letter-spacing:.3em;font-size:11px;color:var(--ox);text-transform:uppercase;margin-bottom:18px}
+.masthead h1{font-family:var(--serif);font-weight:700;font-size:52px;line-height:1.04;letter-spacing:-1px;color:var(--ink);margin:0 0 14px;max-width:9em}
+.masthead .standfirst{font-family:var(--serif);font-size:19px;line-height:1.6;color:var(--ink2);max-width:30em;margin:0 0 22px}
+.masthead .meta{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:14px}
+.masthead .meta b{color:var(--ink);font-weight:600}
+/* dashboard — stacked full width */
+.dash{margin:34px 0 10px}
+.dash .dh{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+.figrow{margin:30px 0;padding-top:22px;border-top:1px solid var(--line)}
+.figrow:first-of-type{border-top:none}
+.figrow h4{font-family:var(--serif);font-size:18px;color:var(--ink);margin:0 0 2px;font-weight:700}
+.figrow .cap{font-size:12.5px;color:var(--muted);margin:0 0 12px}
+.chart{width:100%}
+@media(max-width:640px){.masthead h1{font-size:38px}}
+/* body typography */
+#content h1{font-family:var(--serif);font-weight:700;font-size:33px;line-height:1.15;color:var(--ink);margin:64px 0 6px;padding-top:26px;border-top:1px solid var(--line2);letter-spacing:-.5px}
+#content h1:first-child{border-top:none;padding-top:0;margin-top:30px}
+#content h2{font-family:var(--serif);font-weight:700;font-size:23px;color:var(--ink);margin:42px 0 10px}
+#content h3{font-weight:700;font-size:16px;color:var(--ox);letter-spacing:.02em;margin:30px 0 8px}
+#content h4{font-weight:700;font-size:14.5px;color:var(--ink2);margin:22px 0 6px}
+#content p{margin:0 0 16px;text-align:justify}
+#content a{color:var(--ox);text-decoration:none;border-bottom:1px solid var(--line2)}
+#content strong{color:var(--ink);font-weight:700}
+#content em{color:var(--ox2);font-style:normal;background:linear-gradient(transparent 60%,#f0e6cf 60%)}
+#content ul,#content ol{margin:0 0 18px;padding-left:1.3em}
+#content li{margin:0 0 7px}
+#content ul li::marker{color:var(--ox)}
+#content blockquote{margin:22px 0;padding:4px 0 4px 22px;border-left:3px solid var(--gold);font-family:var(--serif);font-size:18px;line-height:1.6;color:var(--ink);font-style:italic}
+#content hr{border:none;border-top:1px solid var(--line);margin:34px 0}
+#content code{font-family:"SF Mono",Menlo,monospace;font-size:.82em;background:var(--paper2);padding:1px 5px;border-radius:3px;color:var(--ox)}
+#content pre{background:#221f1a;color:#e6ddc9;border-radius:6px;padding:18px 20px;overflow-x:auto;font-size:12px;line-height:1.55;margin:20px 0;box-shadow:inset 0 0 0 1px #000}
+#content pre code{background:none;color:inherit;padding:0;font-size:12px}
+/* tables — editorial + 防竖排 + 横向滚动 */
+.tablewrap{overflow-x:auto;margin:22px 0;-webkit-overflow-scrolling:touch}
+#content table{width:100%;border-collapse:collapse;margin:0;font-size:13px;line-height:1.5;table-layout:auto}
+#content th,#content td{word-break:keep-all;overflow-wrap:break-word}
+#content thead th{font-weight:700;color:var(--ink);text-align:left;border-bottom:2px solid var(--ink);padding:8px 10px;background:var(--paper2);white-space:nowrap}
+#content tbody td{padding:7px 10px;border-bottom:1px solid var(--line);color:var(--ink2);vertical-align:top}
+#content tbody td:first-child,#content thead th:first-child{white-space:nowrap;font-weight:600;color:var(--ink)}
+#content tbody tr:hover{background:#f5f1e7}
+/* ticker → Yahoo 链接 */
+a.tk-link{color:var(--ox);border-bottom:1px dotted var(--ox2);font-family:"SF Mono",Menlo,monospace;font-size:.94em;white-space:nowrap}
+a.tk-link::after{content:"↗";font-size:.7em;vertical-align:super;opacity:.6;margin-left:1px}
+/* inline rendered figure */
+.vizfig{margin:24px 0 30px}
+.vizfig figcaption{font-family:var(--serif);font-size:13px;color:var(--muted);font-style:italic;margin:0 0 3px;padding-left:12px;border-left:3px solid var(--gold)}
+/* V2.6 卖方级图表描述：结论式副标题 + 数据源脚注（全图共用 figHead/figFoot）*/
+.vfig-sub{font-family:var(--serif);font-size:15.5px;line-height:1.5;color:var(--ink);font-weight:700;margin:0 0 12px;padding-left:12px}
+.vfig-foot{margin-top:11px;padding-top:7px;border-top:1px dotted var(--line2);font-size:10.5px;color:var(--faint);display:flex;flex-wrap:wrap;gap:3px 18px}
+.vfig-foot .vfig-hint{font-style:italic}
+.vfig-foot .vfig-src{margin-left:auto}
+.vchart{width:100%}
+.mermaid{text-align:center;margin:22px 0}
+/* editorial chain diagram */
+.chain-fig{margin:4px 0 8px}
+.clayer{display:grid;grid-template-columns:74px 1fr;gap:0 20px;padding:20px 0;border-top:1px solid var(--line)}
+.clayer:last-child{border-bottom:1px solid var(--line)}
+.clayer .num{font-family:var(--serif);font-size:50px;line-height:.82;color:var(--line2);font-weight:700}
+.clayer.bn .num{color:var(--ox)} .clayer.hi .num{color:var(--gold)}
+.clayer .lname{font-size:17px;font-weight:700;color:var(--ink)}
+.clayer .lname .stars{color:var(--goldbar);font-size:12px;letter-spacing:1px;margin-left:9px}
+.clayer .ldef{color:var(--muted);font-size:12.5px;margin:3px 0 11px;line-height:1.6}
+.clayer .plist{font-size:14px;line-height:2.05;color:var(--ink2)}
+.clayer .pl .sup{font-size:10px;vertical-align:super;font-weight:700;margin-right:1px}
+.clayer .sep{color:var(--line2);margin:0 8px}
+.clayer .tk{font-size:11px;color:var(--ox);font-weight:600;font-family:"SF Mono",monospace}
+.clayer .pv{font-size:10px;color:var(--faint);border:1px solid var(--line2);border-radius:3px;padding:0 3px;margin-left:2px}
+.clayer .sh{color:var(--gold);border-bottom:2px solid var(--goldbar);font-weight:700}
+.clayer .note{display:block;font-size:12px;color:var(--ox);margin-top:6px;font-style:italic;font-family:var(--serif)}
+.chain-legend{display:flex;flex-wrap:wrap;gap:7px 18px;font-size:11.5px;color:var(--muted);margin:8px 0 0;padding-top:12px;border-top:1px dashed var(--line2)}
+.chain-legend .sup{font-size:10px;vertical-align:super;font-weight:700;margin-right:2px}
+.natus{color:#8c2f23}.nateu{color:#1e7e4f}.natcn{color:#b8860b}.natres{color:#8a8a8a}.natgate{color:#6d4c9a}
+/* value-flow 富渲染 */
+.vf{font-family:var(--sans)}
+.vf .vf-h{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);margin:18px 0 8px}
+.vf-src{background:var(--paper2);border-radius:8px;padding:14px 18px}
+.vf-src .s{font-size:13.5px;line-height:1.7;color:var(--ink2)}
+.vf-src .s b{color:var(--ink)}
+.vf-conn{text-align:center;color:var(--line2);font-size:13px;margin:8px 0;letter-spacing:2px}
+.vf-layer{position:relative;border:1px solid var(--line);border-left:4px solid var(--line2);border-radius:8px;padding:13px 16px;margin:10px 0;background:#fff}
+.vf-layer.pool{border-left-color:var(--goldbar);background:linear-gradient(100deg,#fbf6e6,#fff 60%)}
+.vf-layer.tuna{border-left-color:var(--ox)}
+.vf-layer .lh{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.vf-layer .id{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--ox);line-height:1}
+.vf-layer.pool .id{color:var(--gold)}
+.vf-layer .nm{font-size:15.5px;font-weight:700;color:var(--ink)}
+.vf-layer .nat{font-size:11.5px;color:#fff;background:var(--muted);border-radius:10px;padding:1px 8px}
+.vf-layer.pool .nat{background:var(--gold)} .vf-layer.tuna .nat{background:var(--ox)}
+.vf-layer .annot{margin-left:auto;font-size:11.5px;color:var(--ox);font-style:italic;font-family:var(--serif)}
+.vf-layer .pl{font-size:13px;color:var(--ink2);margin-top:7px;line-height:1.7}
+.vf-layer .pl .dot{color:var(--line2);margin:0 6px}
+.vf-layer .key{font-size:12px;color:var(--gold);margin-top:6px;font-weight:600}
+.vf-flownote{font-size:12px;color:var(--muted);font-style:italic;text-align:center;margin:4px 0;font-family:var(--serif)}
+.vf-div{display:flex;align-items:center;gap:12px;margin:22px 0 6px;color:var(--ink);font-weight:700;font-size:14px}
+.vf-div::before,.vf-div::after{content:"";flex:1;height:1px;background:var(--line2)}
+.vf-pools{counter-reset:pool;display:grid;gap:8px;margin-top:6px}
+.vf-pool{display:flex;align-items:baseline;gap:10px;background:#fff;border:1px solid var(--line);border-radius:7px;padding:9px 14px;font-size:13.5px}
+.vf-pool .pn{font-family:var(--serif);font-weight:700;color:var(--gold);font-size:16px;flex:none;width:18px}
+.vf-pool .pt{color:var(--ink2)} .vf-pool .pt b{color:var(--ink)}
+.vf-pool .pg{margin-left:auto;color:var(--goldbar);font-size:11px;white-space:nowrap}
+.vf-take{margin-top:16px;padding:14px 18px;background:#241f17;color:#f0e6cf;border-radius:8px;font-size:14px;line-height:1.7}
+.vf-take b{color:#f4c95d}
+/* 生命周期 × 卡脖子定位矩阵（A.2）*/
+.lcm{display:grid;gap:3px;margin:8px 0 4px;font-family:var(--sans);font-size:12.5px}
+.lcm .lc-corner{font-family:var(--serif);font-size:11px;color:var(--muted);padding:8px;display:flex;align-items:center;background:var(--paper2);border-radius:3px}
+.lcm .lc-h{color:#fff;font-weight:700;text-align:center;padding:7px 4px;border-radius:3px;font-size:12px}
+.lcm .lc-row{font-family:var(--serif);font-weight:700;color:var(--ink);padding:8px;display:flex;align-items:center;background:var(--paper2);border-radius:3px}
+.lcm .lc-cell{padding:7px 6px;border-radius:3px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:36px}
+.lcm .lc-chip{background:#fff;border:1px solid var(--line2);border-radius:4px;padding:1px 7px;color:var(--ink2);font-size:12px;white-space:nowrap}
+.lcm .lc-dash{color:var(--faint)}
+/* timeline 时间线（作品/catalyst/事件）*/
+.tl{position:relative;margin:6px 0 4px;padding-left:4px;border-left:2px solid var(--line2)}
+.tl-it{position:relative;padding:0 0 16px 20px}
+.tl-it::before{content:"";position:absolute;left:-7px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--ox);border:2px solid var(--paper)}
+.tl-it.up::before{background:var(--gold)}
+.tl-it .d{font-family:"SF Mono",Menlo,monospace;font-size:11px;color:var(--ox);font-weight:600}
+.tl-it .t{font-weight:700;color:var(--ink);font-size:14px;margin:1px 0}
+.tl-it .x{color:var(--muted);font-size:12.5px;line-height:1.6}
+.tl-it .tag{font-size:10px;color:#fff;background:var(--gold);border-radius:3px;padding:0 6px;margin-left:6px;vertical-align:middle}
+/* scorecard 命中率卡 */
+.scard{margin:6px 0 4px}
+.scard .hr{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}
+.scard .hr .big{font-family:var(--serif);font-size:40px;font-weight:700;color:var(--ox);line-height:1}
+.scard .hr .lb{font-size:13px;color:var(--muted)}
+.scard .row{display:grid;grid-template-columns:22px 84px 1fr;gap:0 10px;padding:8px 0;border-top:1px solid var(--line);align-items:start;font-size:13px}
+.scard .row:last-child{border-bottom:1px solid var(--line)}
+.scard .ic{font-weight:700;text-align:center}
+.scard .ic.hit{color:#1e7e4f}.scard .ic.miss{color:#c0392b}.scard .ic.part{color:var(--gold)}
+.scard .dt{font-family:"SF Mono",Menlo,monospace;font-size:11px;color:var(--faint)}
+.scard .pr b{color:var(--ink)}.scard .pr .nt{color:var(--muted);font-size:12px;display:block;margin-top:2px}
+/* gauge 评分仪表 */
+.gau{margin:6px 0 4px}
+.gau .top{display:flex;align-items:baseline;gap:8px;margin-bottom:12px}
+.gau .top .big{font-family:var(--serif);font-size:40px;font-weight:700;color:var(--gold);line-height:1}
+.gau .top .mx{font-size:14px;color:var(--faint)}
+.gau .top .lb{font-size:13px;color:var(--ink2);margin-left:6px}
+.gau .sub{display:grid;grid-template-columns:130px 1fr 46px;gap:7px 10px;align-items:center;font-size:12.5px;margin-top:6px}
+.gau .sub .nm{color:var(--ink2)}
+.gau .bar{height:8px;background:var(--paper2);border-radius:4px;overflow:hidden}
+.gau .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),var(--goldbar))}
+.gau .sub .vv{color:var(--muted);font-size:11px;text-align:right}
+/* cycle 双轴定位（生命周期 S 曲线 × 周期相位）*/
+.cyc{margin:6px 0 4px}
+.cyc-ax{margin:12px 0 6px}
+.cyc-lbl{font-size:12.5px;color:var(--ink2);margin-bottom:2px}
+.cyc-lbl b{color:var(--ox);font-weight:700}
+.cyc svg{width:100%;height:auto;display:block;overflow:visible}
+.cyc-sig{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:16px}
+@media(max-width:560px){.cyc-sig{grid-template-columns:1fr}}
+.cyc-sig .col h5{margin:0 0 5px;font-size:11.5px;font-weight:700;letter-spacing:.02em}
+.cyc-sig .danger h5{color:#c0392b}.cyc-sig .safe h5{color:#1e7e4f}.cyc-sig .watch h5{color:var(--gold)}
+.cyc-sig ul{margin:0;padding-left:1.05em;line-height:1.5}
+.cyc-sig li{margin:0 0 4px;color:var(--ink2);font-size:12px}
+.cyc-bm{margin-top:14px;padding:10px 14px;background:var(--paper2);border-radius:6px;font-size:12px;color:var(--ink2);line-height:1.6}
+.cyc-bm b{color:var(--ink)}
+.cyc-basis{margin-top:13px;font-size:12px;color:var(--ink2);line-height:1.6}
+.cyc-basis b{color:var(--gold)}
+.cyc-syn{margin-top:13px;padding:11px 15px;background:#241f17;color:#f0e6cf;border-radius:7px;font-size:13px;line-height:1.65;font-weight:600}
+/* trend 强度指标时序小多图（周期证据层）*/
+.tr{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:14px;margin:6px 0 4px}
+.tr-cell{border:1px solid var(--line);border-radius:7px;padding:10px 12px;background:#fff}
+.tr-nm{font-size:12px;font-weight:700;color:var(--ink);margin-bottom:5px;line-height:1.3}
+.tr svg{width:100%;height:auto;display:block}
+.tr-foot{display:flex;align-items:baseline;justify-content:space-between;margin-top:5px}
+.tr-val{font-family:"SF Mono",Menlo,monospace;font-size:14px;font-weight:700;color:var(--ink)}
+.tr-dir{font-size:15px;font-weight:700;line-height:1}
+.tr-note{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.45}
+/* benchbar 当前 vs 历史泡沫阈值对标条 */
+.bb{margin:6px 0 4px}
+.bb-an{font-size:12px;color:var(--muted);margin-bottom:12px}
+.bb-an b{color:var(--ox)}
+.bb-row{display:grid;grid-template-columns:148px 1fr 150px;gap:6px 12px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.bb-row:last-child{border-bottom:1px solid var(--line)}
+.bb-nm{font-size:12.5px;color:var(--ink2);font-weight:600}
+.bb-track{position:relative;height:13px;background:var(--paper2);border-radius:7px}
+.bb-fill{height:100%;border-radius:7px}
+.bb-thr{position:absolute;top:-4px;width:2px;height:21px;background:var(--ink);opacity:.72}
+.bb-anmark{position:absolute;top:50%;width:9px;height:9px;background:var(--ox);transform:translate(-50%,-50%) rotate(45deg);border:1px solid #faf8f3}
+.bb-val{font-size:12px}
+.bb-val b{font-family:"SF Mono",Menlo,monospace}
+.bb-dir{font-size:9.5px;color:var(--faint);font-weight:400;margin-left:6px;white-space:nowrap}
+.bb-refline{display:block;font-size:9.5px;color:var(--faint);margin-top:2px}
+.bb-ref{color:var(--ox)}
+.bb-note{grid-column:1/-1;font-size:11px;color:var(--muted);margin:2px 0 0;padding-left:160px;line-height:1.4}
+@media(max-width:560px){.bb-row{grid-template-columns:1fr}.bb-note{padding-left:0}}
+/* anatomy 实体标注解剖图（编号 callout schematic + 图例表 · /techdive 技术详解）*/
+.anat{margin:6px 0 4px}
+.anat-board{width:100%;height:auto;display:block;background:var(--paper2);border:1px solid var(--line2);border-radius:8px}
+.anat-board .ab-bg{fill:#f6f1e4;stroke:var(--line2);stroke-width:1.5}
+.anat-board .ab-part rect{stroke:var(--paper);stroke-width:1.5;rx:3}
+.anat-board .ab-badge{fill:var(--ink);stroke:var(--paper);stroke-width:1.5}
+.anat-board .ab-bnum{fill:#faf8f3;font-family:var(--serif);font-weight:700;font-size:11px;text-anchor:middle}
+.anat-board .ab-pname{fill:var(--ink2);font-family:var(--sans);font-size:8.5px;text-anchor:middle}
+/* V2.7.1 通用原型外壳 / 部件图元 / 外置 leader-line 标注 */
+.anat-board .ab-shell{fill:#f1ead9;stroke:var(--line2);stroke-width:1.4}
+.anat-board .ab-shell2{fill:#e9e0cb;stroke:var(--line2);stroke-width:1.2}
+.anat-board .ab-edge{fill:none;stroke:var(--line2);stroke-width:1.2}
+.anat-board .ab-edge-d{fill:none;stroke:var(--faint);stroke-width:.8;stroke-dasharray:3 3}
+.anat-board .ab-trace{fill:none;stroke:#c9a227;stroke-width:.8;opacity:.5}
+.anat-board .ab-metal{fill:#d8cdb4;stroke:var(--line2);stroke-width:1.2}
+.anat-board .ab-hole{fill:var(--paper2);stroke:var(--line2);stroke-width:1}
+.anat-board .ab-pin{stroke:#6b655c;stroke-width:1.1;stroke-linecap:round}
+.anat-board .ab-pin1{fill:#8c2f23}
+.anat-board .ab-glyph-ln{fill:none;stroke:var(--paper2);stroke-width:.9;opacity:.65}
+.anat-board .ab-lead{fill:none;stroke:var(--faint);stroke-width:.5;stroke-dasharray:2.5 2.5}
+.anat-board .ab-tsv{fill:none;stroke:#a8483a;stroke-width:1.1;stroke-dasharray:2 2;opacity:.7}
+.anat-board .ab-pname-o{fill:var(--muted);font-family:var(--sans);font-size:8px}
+.anat-leg{width:100%;border-collapse:collapse;margin:14px 0 0;font-size:12.5px;line-height:1.5}
+.anat-leg th{font-weight:700;color:var(--ink);text-align:left;border-bottom:2px solid var(--ink);padding:7px 9px;background:var(--paper2);white-space:nowrap}
+.anat-leg td{padding:7px 9px;border-bottom:1px solid var(--line);color:var(--ink2);vertical-align:top}
+.anat-leg tr:hover td{background:#f5f1e7}
+.anat-leg .lg-n{font-family:var(--serif);font-weight:700;color:var(--ox);text-align:center;white-space:nowrap}
+.anat-leg .lg-nm{font-weight:600;color:var(--ink);white-space:nowrap}
+.anat-leg .lg-nm .gr{color:var(--goldbar);font-size:10px;letter-spacing:.5px;margin-left:5px}
+.anat-leg .lg-co{font-family:"SF Mono",Menlo,monospace;font-size:11px;color:var(--ox);white-space:nowrap}
+.anat-leg .lg-co .sec{color:var(--faint);font-family:var(--sans);font-size:10px;margin-left:4px}
+.anat-leg .lg-dash{color:var(--faint)}
+.anat-note{margin-top:11px;font-size:11.5px;color:var(--muted);line-height:1.6;font-style:italic;font-family:var(--serif)}
+.colophon{margin-top:60px;padding-top:20px;border-top:3px double var(--line2);font-size:12px;color:var(--faint)}
+/* 打印 / 导出 PDF：图与卡片不跨页截断，去链接下划线噪点 */
+@media print{
+ body{font-size:12pt} .page{max-width:none;padding:0 12mm 12mm}
+ .vizfig,.clayer,.vf-layer,.vf-pool,.figrow,.chart,.vchart,.tablewrap,.mermaid,.anat-board{break-inside:avoid;page-break-inside:avoid}
+ #content h1,#content h2{break-after:avoid}
+ a{color:var(--ink2)!important;border-bottom:none!important} a.tk-link::after{content:""}
+}
+</style></head>
+<body>
+<div class="page">
+ <div class="masthead">
+  <div class="kick">BCA 产业研究 · AI Data Center · 2026-Q2</div>
+  <h1>AI数据中心全景</h1>
+  <div class="standfirst">真瓶颈是电力不是芯片，矿工正被重定价为 AI 基础设施</div>
+  <div class="meta"><span><b>口径</b> 美股 / 3 年视角 / yfinance 真调载止 2026-06-08</span><span><b>覆盖</b> 20 标的 · REIT+NEOCLOUD+矿工转型</span><span><b>结论</b> 利润沉淀在卖水人，neocloud 是脆弱夹层</span></div>
+ </div>
+ <div class="dash"><div class="dh">— 速览 / At a Glance —</div><div id="dashboard"></div></div>
+ <div id="content"></div>
+ <div class="colophon">BCA 双线投研系统 · industry-research · 数据真实性优先（拿不到标"→需补"，绝不编造）· ticker ↗ 跳 Yahoo Finance · 本文件为研究草稿，非投资建议。</div>
+</div>
+<script type="text/markdown" id="md"># AI 数据中心全景（IDC/云 REIT + NEOCLOUD + 矿工转型）— 产业研究
+
+*2026-Q2 · 3 年视角 · 机构卖方研报风格*
+
+---
+
+## 目录
+
+- [一、执行摘要](#一执行摘要)
+- [二、为什么是现在](#二为什么是现在)
+- [三、产业全景与双轴定位](#三产业全景与双轴定位生命周期--周期相位)
+- [四、产业链结构](#四产业链结构)
+- [五、价值链与利润池](#五价值链与利润池)
+- [六、关键 link 深度档案](#六关键-link-深度档案)
+- [七、地缘与政策约束](#七地缘与政策约束)
+- [八、投资标的与组合建议](#八投资标的与组合建议)
+- [九、风险、证伪与月度跟踪](#九风险证伪与月度跟踪)
+- [十、邻接产业与历史类比](#十邻接产业与历史类比)
+- [十一、结论与下一步](#十一结论与下一步)
+- [附录 A：跨 link 对比矩阵](#附录-a跨-link-对比矩阵)
+- [附录 B：完整 KPI 速查表](#附录-b完整-kpi-速查表)
+- [附录 C：信息源与方法论](#附录-c信息源与方法论)
+- [附录 D：紫苏叶清单](#附录-d紫苏叶清单金枪鱼-vs-紫苏叶)
+
+---
+
+# 一、执行摘要
+
+*这一节是给只有 5 分钟时间的高管看的。如果只读这一节，应该能拿到 80% 的研究价值。*
+
+2026 年第一季度，四大超大规模厂商（Amazon、Alphabet、Microsoft、Meta）将 2026 年资本开支指引合计推高至约 7250 亿美元，较 2025 年的 4100 亿美元增长 77%，其中约 75% 直接投向 AI 基础设施。把 Oracle 计入后，五大云的承诺资本开支区间升至 6600 亿至 6900 亿美元，接近 2025 年的两倍。这是一组史无前例的数字，但本研究认为真正值得 PM 注意的并非开支规模本身，而是开支撞上了一堵物理墙：截至 2026 年初，美国并网队列堆积约 2600GW 待批发电与储能项目，ERCOT 单是第一季度就收到 198GW 大负荷并网申请，其大负荷队列总量达 410GW、其中数据中心占 87%。变压器交期从 2023 年的约 140 周拉长到 2026 年的 160 周以上，一个项目从申请到通电平均耗时超过 7 年。资本与芯片不再是约束，电力才是。
+
+这一约束重写了整个产业的价值分配。当电力成为稀缺品，谁手里握着"已通电的土地 + 已签的电力合同"，谁就掌握了不可外购的咽喉。这正是比特币矿工集体转型 AI 数据中心的底层逻辑：它们用过去七年为挖矿圈下的电力容量，把"可随时中断的挖矿负荷"置换成"15 年 take-or-pay 的 AI 租约"。据 CoinShares 统计，上市矿工已累计签下超 700 亿美元 AI/HPC 合同，行业 AI 收入占比预计从当前约 30% 升至 2026 年底的约 70%。
+
+**本研究跟踪的 5 个核心判断**（来自自建 + Phase 1 行业共识）：
+
+- **论断 1**：电力与并网是真命门，已替代芯片成为硬瓶颈 — 2600GW 队列 + 7 年并网 + 变压器 160 周交期 → 验证位置 [§4 第零层 + §6.1]
+- **论断 2**：矿工转型是期权重定价而非估值泡沫 — 可中断负荷换 15 年 take-or-pay 租约，$70B+ 合同已落地 → 验证位置 [§6.4 + §6.5 + §8]
+- **论断 3**：Neocloud 的久期错配 + 循环融资是最脆弱环节 — GPU 3-4 年寿命对 15-20 年债务，Oracle 54% RPO 系单一客户 → 验证位置 [§6.6 + §6.7 + §9]
+- **论断 4**：确定性利润池在卖水人而非 neocloud — EQIX 维持 51% EBITDA，neocloud 普遍负净利重债 → 验证位置 [§5 + §6.2 + §6.3]
+- **论断 5**：物理墙锁定 alpha 在不可采购环节 — 机柜功率从 30MW 跃至 GW 级，液冷与变压器是必经之路 → 验证位置 [§6.2 + 附录 D]
+
+五个论断并非彼此独立，而是一条因果链。论断 1（电力稀缺）是地基，它直接催生论断 2（持有电力的矿工被重定价）与论断 5（物理墙环节的紫苏叶价值）。论断 4（利润池在卖水人）与论断 3（neocloud 脆弱）则是同一枚硬币的两面：当中游 GPU 云用沉重的 GPU 抵押债去搏 backlog 兑现时，真正旱涝保收的是收过路费的 REIT 与卖铲子的设备商。换言之，整个产业的钱从超大规模厂商的资本开支流出，沿着芯片、物业、neocloud 一路向下，但利润最终沉淀在两个位置：握有稀缺电力的物业方，和供应不可替代设备的卖水人。Neocloud 处在收入最高、利润最薄、杠杆最重的夹层。
+
+投资动作 3 层（详见 §8）：(1) 最高确信度配置确定性卖水人 EQIX/DLR + 设备龙头 Vertiv（间接），享 AI 需求但不承担执行风险；(2) 配置持有稀缺电力、契约质量最高的矿工转型标的 IREN/CIFR/WULF，吃期权重定价；(3) 对冲做空久期错配最严重、backstop 最弱的高 PS neocloud 与纯故事矿工。
+
+本报告全文约 2.1 万字 + 1 个 data.json 机器可读。建议阅读：基金 GP 看 §1 + §8 + §11（12 min）；行业研究员顺读全文（60 min）；地缘/电力分析师重点 §6.1 + §7 + §9。
+
+---
+
+# 二、为什么是现在
+
+*这一节回答"why now"——给读者花 45 分钟读完全文的动机。*
+
+判断这个赛道处在重定价临界点的最直接证据，是市场对同一类资产给出了相差十倍以上的估值。TeraWulf（WULF）当前市销率约 75 倍、Nebius（NBIS）约 67 倍、Cipher（CIFR）约 47 倍，而仍以挖矿为主的 Bitdeer（BTDR）约 6 倍、CleanSpark（CLSK）约 5.7 倍、MARA 约 5.8 倍。这些公司物理资产高度相似，都是"电力 + 机房 + 计算硬件"的组合，估值差异几乎全部来自一个变量：契约化 AI 收入的可见度。市场正在用真金白银投票，把"已签 15 年 take-or-pay 租约"的电力资产，从矿工估值体系迁移到数据中心 REIT 估值体系。这种迁移一旦完成不可逆，而当前正处在迁移的中段，多数标的的重定价只走了一半。
+
+这并非孤立现象。Oracle 在 2026 财年把剩余履约义务（RPO）做到了 5530 亿美元，同比增长 325%，约相当于其当前年化收入的 8 倍，背后是与 OpenAI 的 Stargate 项目约 3000 亿美元、五年期算力合约。CoreWeave 的收入 backlog 在 2026 年第一季度逼近 1000 亿美元（994 亿），单季新增创历史纪录，其中包括与 Meta 签订的约 210 亿美元、延续至 2032 年的合约。这些数字共同指向一个事实：AI 算力的需求侧已经从"训练实验"转为"推理规模化部署"，Equinix 在 2026 年第一季度明确确认企业 AI 工作负载已从试点进入规模化，推动季度收入 24.4 亿美元、创纪录的 3.78 亿美元首季年化新签订单。需求是真实的，分歧只在于供给能否跟上，以及谁能从供给瓶颈中收租。
+
+更值得关注的是时间窗口。三个催化剂在未来 12 至 24 个月集中兑现。其一，矿工转型标的的 AI 收入在 2026 年陆续转固并开始确认，TeraWulf 第一季度 HPC 收入已达 2100 万美元、占总收入 3400 万的多数，财务验证正从"PPT 合同"变为"利润表数字"。其二，Stargate 与各超大规模厂商的 GW 级园区在 2026 至 2027 年密集通电，电力交付能力将成为区分赢家与输家的唯一标尺。其三，GPU 债务墙的首批再融资压力在 2026 至 2027 年显现，最脆弱的高杠杆 neocloud 与纯故事矿工将面临久期错配的第一次真实考验。三者叠加，使 2026 年成为这个赛道分化加速的一年。
+
+本研究的边界。本研究聚焦数据中心"物理层 + 资本层"的全景，覆盖电力/并网、电力与冷却设备、数据中心 REIT、AI-native 开发商与矿工转型、neocloud/GPU 云、Oracle 与第二梯队云、超大规模买家七个环节，以及贯穿其中的资本栈。本研究不深入 GPU 芯片本身的设计细节（属半导体邻接容器）与 AI 模型层的竞争格局（属软件邻接），但会在价值传导与卡脖子分析中纳入这两层作为约束条件。所有财务数据真调 yfinance，载止 2026-06-08。
+
+---
+
+# 三、产业全景与双轴定位（生命周期 × 周期相位）
+
+*这一节给读者建立产业的"心智模型"——市场规模、商业模式分布，并做双轴定位。*
+
+<!--VIZ:cycle-->
+
+AI 数据中心是一个被资本开支洪流重塑的产业。美国数据中心总容量预计从 2026 年的约 24GW 扩张到 2030 年的约 100GW，四年增长逾 4 倍。这个体量背后是一个分层市场：最上游的电力与并网是物理约束层，中游的物业与 neocloud 是资本密集的运营层，下游的超大规模厂商既是最大买家又是自建竞争者。商业模式上，产业呈现出鲜明的"哑铃结构"，一端是收过路费的 REIT 与卖设备的供应商（轻周期、高确定性、估值合理），另一端是搏 backlog 兑现的 neocloud 与矿工转型标的（重资本、高弹性、估值分化），中间地带的传统托管商正被快速边缘化。
+
+## 3.0 轴①：生命周期阶段（结构性）
+
+阶段诊断是成长期早中段。从五个维度看：增速上，超大规模资本开支同比增长 77%、矿工 AI 合同从零到 700 亿美元仅用一年多；渗透率上，AI 工作负载在数据中心总负荷中的占比仍在快速爬升，推理需求才刚从训练需求中分化出来，远未饱和；利润集中度上，REIT 与设备商的利润率已经稳定（EQIX 51% EBITDA），但 neocloud 与矿工转型的盈利模式仍在验证；模式创新上，"Mullet 数据中心策略"（前端跑 AI 长约、后端用挖矿作可中断负荷调峰）等混合范式仍在快速演化；一级融资上，GPU 抵押 ABS、Google 租约 backstop、Nvidia 厂商融资等新型资本结构正密集涌现。这些都是成长期而非成熟期的特征。
+
+这个阶段意味着什么？成长期早中段的核心矛盾不是需求够不够，而是供给（尤其是电力）跟不跟得上，以及商业模式能否在第一轮周期压力中存活。对投资者而言，这带来两件事：一方面，确定性环节（电力物业、卖水人）值得在成长期就重仓，因为它们的护城河已经清晰；另一方面，弹性环节（neocloud、矿工转型）的估值分化会非常剧烈，需要用契约质量、backstop 强度、久期匹配度做精细甄别，而非一篮子买入。
+
+## 3.0b 轴②：当前周期相位（周期性）
+
+数据中心属于硬件/基础设施品类，其主导周期是产能 + 资本周期。当前相位定位为"接近资本开支见顶、但需求侧仍在扩张"的错位状态。资本侧的证据是，四大超大规模厂商 2026 年合计资本开支同比 +77% 至 7250 亿美元，增速本身已接近历史极值，且自由现金流大幅承压，亚马逊 2026 年自由现金流预计转负，这是资本周期接近顶部的典型信号。但需求侧（机柜租约、并网申请）仍在加速，ERCOT 2030 年数据中心电力需求预测在一个规划周期内从 29GW 跳升至 77GW。资本见顶与需求扩张的错位，正是这轮最危险也最易误判的地方：单看需求会过度乐观，单看资本开支增速会过早看空。
+
+<!--VIZ:trend-->
+
+<!--VIZ:benchbar-->
+
+**拐点信号速查表**（前瞻触发器 — 什么发生 → 阶段/周期切换）
+
+| 类型 | 信号 | 当前状态 / 阈值 |
+|---|---|---|
+| ⚠ 危险（→见顶/反转）| 超大规模资本开支增速掉头 | 2026 +77%，若 2027 指引降至个位数即见顶 |
+| ⚠ 危险 | GPU 租赁价格跌破现金成本 | H100 已从 $8/hr 跌至 $2/hr，下一代或再压 |
+| ⚠ 危险 | neocloud 首例 backstop 违约 / 再融资失败 | 尚未发生，2026-27 债务墙是首考 |
+| ✓ 安全（扩张可持续）| 并网队列持续堆积 + 通电交付滞后 | 2600GW 队列、7 年并网，供给紧张持续 |
+| ✓ 安全 | REIT 空置率维持低位 + 续约提价 | 北弗吉尼亚可用容量 <5%，定价权强 |
+| ◉ 关键观察变量 | 自建芯片渗透率（TPU/Trainium/Maia）| 若超大规模厂商大幅转向自研，Nvidia 链与 neocloud 抵押品价值受冲击 |
+| ◉ 关键观察变量 | Stargate/OpenAI 资金链与算力消化 | OpenAI 占 Oracle RPO 约 54%，单点风险 |
+
+**历史对标**：当前周期与 1999-2000 电信泡沫的厂商融资模式高度相似。朗讯（Lucent）1999-2000 年厂商融资承诺达 81 亿美元、占其 336 亿美元收入的 24%；Nvidia 的直接投资与算力承诺合计约 1100 亿美元，占其约 1650 亿美元 LTM 收入的 67%，相对收入的暴露是朗讯的 2.8 倍。这一对标把"AI 是不是泡沫"的定性争论变成可证伪的定量判断：循环融资的相对规模已超过上一轮著名的厂商融资泡沫，但底层需求（AI 推理）的真实性与可货币化程度也远强于当年的电信带宽，结论应是"局部脆弱（高杠杆 neocloud）+ 整体真实（超大规模需求）"，而非全盘看空或全盘看多。
+
+## 3.1 市场规模自下而上三角验证
+
+二手机构对"AI 数据中心市场"的 TAM 估算口径混乱且普遍把硬件、电力、服务混算，只能作交叉参考。本节用自下而上推算锚定真实可寻址市场。主锚口径为"美国数据中心电力容量 × 单位容量年化收入"：美国数据中心容量 2030 年约 100GW，其中新增 AI 容量约 76GW（100GW 减去 2026 年存量 24GW）；按当前 AI 数据中心约 900 万至 1000 万美元/MW 的建设成本（Cipher 管理层口径 $9-10M/MW）与 15 年租约下约 85% 的项目级 EBITDA 率反推，单 MW 年化租金收入约 150 万至 200 万美元。以 76GW 新增容量 × 175 万美元/MW/年的中值计，新增 AI 数据中心物业层年化租金 TAM 约 1330 亿美元/年（76000 MW × 1.75）。这是物业/托管层的可寻址市场，不含上游电力发电与下游云服务。
+
+| TAM 口径 | 数值 | 来源 | 可信度 |
+|---|---|---|---|
+| 自下而上（本研究自建·主锚）| 约 $133B/年（物业租金层）| 76GW 新增 × $1.75M/MW/年 | ⭐⭐⭐⭐ |
+| 超大规模资本开支（需求侧上限）| $660-725B/年（2026）| 五大云资本开支指引 | ⭐⭐⭐ |
+| 二手"AI 数据中心市场"| $200-400B（口径混杂）| MarketsandMarkets / 各家不一 | ⭐⭐ |
+
+自下而上的 $133B 物业租金层与 $660B+ 资本开支需求侧并不矛盾：资本开支含 GPU 采购（约占 60%-70%，属芯片层而非物业层）、电力发电、建筑等，物业租金只是其中沉淀为长期现金流的一段。选物业层为主锚，是因为本研究关注的矿工转型与 REIT 标的恰好坐落于这一层，其收入可被 15 年租约精确锚定，而二手 TAM 的口径混杂导致虚高且不可溯源。
+
+---
+
+# 四、产业链结构
+
+*这一节让读者看清整条产业链 7 层结构 + 谁卡谁。*
+
+整个产业链可以分为 7 层结构，从最上游的电力与并网到最下游的 AI 应用需求，再叠加一层横向贯穿的资本栈。与多数硬件产业链不同，数据中心产业链的卡脖子点不在中游制造，而在两端：最上游的电力/并网（物理稀缺）和横向的资本结构（融资稀缺）。中间的芯片层虽最昂贵且高度寡占（Nvidia 主导），但其供给约束正逐步让位于电力约束，这是 2026 年最重要的结构性变化。下面的 ASCII 全景图在每一层标注了关键玩家、国别集中度和卡脖子等级。
+
+<!--VIZ:chain-->
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│              AI 数据中心产业链全景（2026-Q2）                                   │
+│         符号：⭐ 卡脖子度 / ◆ 美国 / ● 日韩欧 / ▲ 中国 / ◇ 资源国              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+【第零层：电力与并网（物理稀缺 · 真命门）】 ⭐⭐⭐⭐⭐
+┌────────────────────────────────────────────────────────────────────┐
+│ ◆ 燃气轮机 GE Vernova(GEV)·西门子能源(SIEGY●) │ ◆ 核电/SMR NuScale(SMR) │
+│ ◆ 电网/输电 NextEra(NEE)·Vistra(VST)·Constellation(CEG) │ ◇ 天然气燃料  │
+│ ◆ 并网队列容量(不可外购) ERCOT 410GW队列·PJM 220GW │ ◆ 行为电源 Bloom(BE)│
+│   卡脖子：变压器 160 周交期·并网 7 年·2600GW 待批 = 全链最硬约束       │
+└────────────────────────────────────────────────────────────────────┘
+                                  ▼
+【第一层：电力与冷却设备（picks-and-shovels · 紫苏叶富集层）】 ⭐⭐⭐⭐
+┌────────────────────────────────────────────────────────────────────┐
+│ ◆ 综合电力+冷却 Vertiv(VRT)·Eaton(ETN) │ ● 变压器 日立能源·西门子能源 │
+│ ◆ 液冷 CDU/冷板 Vertiv·● 快接头 Staubli(瑞士私有🌿)·CPC │ ◆ 开关柜 ETN │
+│ ◆ 固态变压器(SST) Heron/DG Matrix/Amperesand(私有→需补) │ ● 施耐德(SBGSY)│
+│   卡脖子：变压器/开关柜交期 + 高密度液冷工艺 = 物理墙环节             │
+└────────────────────────────────────────────────────────────────────┘
+                                  ▼
+【第二层：算力芯片（最昂贵 · 寡占 · 供给约束让位电力）】 ⭐⭐⭐⭐⭐
+┌────────────────────────────────────────────────────────────────────┐
+│ ◆ GPU Nvidia(NVDA 主导)·AMD(MI355X) │ ◆ 自研 ASIC Google TPU·AWS      │
+│   Trainium·Meta MTIA·Microsoft Maia │ ● HBM SK海力士·三星·美光(MU◆)   │
+│ ● 先进封装 CoWoS 台积电(TSM)·🌿 ABF载板 味之素(日) │ 卡脖子 ⭐⭐⭐⭐⭐ │
+└────────────────────────────────────────────────────────────────────┘
+                                  ▼
+【第三层：数据中心物业 / 开发（REIT + AI-native + 矿工转型）】 ⭐⭐⭐⭐
+┌────────────────────────────────────────────────────────────────────┐
+│ ◆ REIT 包租公 Equinix(EQIX)·Digital Realty(DLR)·American Tower(AMT)   │
+│   ·Iron Mountain(IRM) │ ◆ AI-native Applied Digital(APLD)            │
+│ ◆ 矿工转型 IREN·TeraWulf(WULF)·Cipher(CIFR)·Hut8(HUT)·Core Sci(CORZ) │
+│   ·Galaxy(GLXY)·MARA·Riot(RIOT)·CleanSpark(CLSK)·Bitdeer(BTDR)        │
+│   卡脖子：已通电土地 = 不可外购 → 矿工的真护城河                       │
+└────────────────────────────────────────────────────────────────────┘
+                                  ▼
+【第四层：Neocloud / GPU 云（中游算力批发 · 高 backlog 高杠杆）】 ⭐⭐⭐
+┌────────────────────────────────────────────────────────────────────┐
+│ ◆ CoreWeave(CRWV $99B backlog)·Lambda·Crusoe │ ● Nebius(NBIS 荷/欧)   │
+│ ◆ Oracle OCI(ORCL $553B RPO) │ 中介定位：坐在模型与硅之间收算力批发价 │
+│   卡脖子：GPU 抵押债 + 久期错配 + 客户集中 = 最脆弱夹层               │
+└────────────────────────────────────────────────────────────────────┘
+                                  ▼
+【第五层：超大规模平台（最大买家 + 自建竞争者）】 ⭐⭐⭐⭐
+┌────────────────────────────────────────────────────────────────────┐
+│ ◆ AWS(AMZN)·Google Cloud(GOOGL)·Azure(MSFT)·Meta │ ◆ Oracle(ORCL)    │
+│   2026 资本开支 $725B(+77%) · 75% 投 AI · 自研芯片降低 Nvidia 依赖     │
+└────────────────────────────────────────────────────────────────────┘
+                                  ▼
+【第六层：AI 模型 / 推理需求（终端需求源）】 ⭐⭐⭐
+┌────────────────────────────────────────────────────────────────────┐
+│ ◆ OpenAI(Stargate $300B)·Anthropic(Hut8 $18B)·xAI·Meta AI │ 推理 > 训练 │
+│   需求真实但客户集中：OpenAI 占 Oracle RPO 54% = 单点风险             │
+└────────────────────────────────────────────────────────────────────┘
+                                  ▼
+【第七层：资本栈 / 融资结构（横向贯穿全链）】 ⭐⭐⭐⭐
+┌────────────────────────────────────────────────────────────────────┐
+│ ◆ 私募信贷 Blackstone·Magnetar·BlackRock │ ◆ GPU 抵押 ABS Lambda 首发 │
+│ ◆ Google 租约 backstop(WULF/CIFR $3.2B+)·Nvidia 厂商融资 $110B        │
+│   卡脖子：循环融资 = 同一美元被算三次（需求/收入/抵押）              │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+**全景图一句话解读**：AI 数据中心产业链是「**美国控全链 + 日欧控关键设备/材料紫苏叶 + 资本栈横向锁定中游命脉**」的结构。卡脖子不在中游制造而在两端：上游电力/并网是物理稀缺（不可外购的已通电土地），横向资本栈是融资稀缺（循环融资的脆弱性）。最昂贵的芯片层（Nvidia）虽寡占，但其供给约束正让位于电力约束，这是判断 alpha 位置的关键。
+
+> 🌿 **紫苏叶标注**：全链最硬的不可采购环节是"已并网的电力容量"本身（无 ticker，体现为矿工转型标的的护城河），其次是第一层的变压器/液冷快接头（Staubli 瑞士私有）与第二层的 ABF 载板（味之素，日）。全部汇总见[附录 D](#附录-d紫苏叶清单金枪鱼-vs-紫苏叶)。
+
+这张全景图揭示了一个常被误读的事实：市场把 AI 数据中心的稀缺性默认锁在芯片上，但 2026 年的真实瓶颈已经下移到电力。当一个 GW 级园区从申请到通电要 7 年，当变压器交期 160 周，谁手里有"现成已通电的电力容量"，谁就拥有了比芯片更稀缺的资产。这解释了为什么一批做比特币挖矿的公司，凭借过去为挖矿圈下的电力，突然成了超大规模厂商和 neocloud 争抢的对象。产业链的价值重心，正在从"谁有最先进的芯片"转向"谁有现成的电力"。
+
+为了精确展示节点之间的依赖关系，下面是 Mermaid 多层流程图，红色高亮节点是 Top 5 卡脖子。
+
+```mermaid
+flowchart TD
+  POWER["⚡ 电力/并网<br/>2600GW队列·7年"]:::bottleneck
+  EQUIP["🔧 电力冷却设备<br/>Vertiv·变压器160周"]:::bottleneck
+  CHIP["🖥️ GPU/ASIC<br/>Nvidia·CoWoS"]:::bottleneck
+  PROP["🏢 物业/REIT<br/>EQIX·DLR + 矿工转型"]
+  NEO["☁️ Neocloud<br/>CoreWeave·Nebius"]:::bottleneck
+  HYPER["🏛️ 超大规模<br/>AWS·Google·Azure"]
+  DEMAND["🤖 AI需求<br/>OpenAI·Anthropic"]
+  CAPITAL["💰 资本栈<br/>GPU抵押债·backstop"]:::bottleneck
+
+  POWER --> EQUIP --> CHIP --> PROP --> NEO --> HYPER --> DEMAND
+  CAPITAL -.贯穿.-> PROP
+  CAPITAL -.贯穿.-> NEO
+  DEMAND -.资本开支回流.-> HYPER
+
+classDef bottleneck fill:#ff6b6b,stroke:#000,stroke-width:3px,color:#fff
+```
+
+这张流程图的关键在于两条非线性连接：资本栈横向贯穿物业与 neocloud（虚线），意味着融资条件恶化会同时冲击两层；而下游 AI 需求通过超大规模厂商的资本开支回流（虚线反向），构成了循环融资的物理基础。当 Nvidia 投资 neocloud、neocloud 又买 Nvidia 芯片时，同一笔钱在产业链里被记了三次。
+
+## 4.1 上中下游如何回应核心判断
+
+七层结构对五个核心判断给出了清晰的产业级映射。论断 1（电力是真命门）的物质载体在第零层：2600GW 并网队列、ERCOT 410GW 大负荷队列（87% 是数据中心）、变压器 160 周交期，构成全链最硬约束，而这一约束的受益者在第三层（持有已通电土地的矿工转型标的）。论断 2（矿工转型是期权重定价）的证据完全落在第三层：同样的"电力 + 机房"资产，签下 15 年 take-or-pay 租约后估值从矿工体系迁移到 REIT 体系，IREN 的 97 亿美元 Microsoft 合约、CIFR 的 55 亿美元 AWS 合约是直接实证。论断 3（neocloud 脆弱）的验证位置在第四层与第七层的交汇：CoreWeave 994 亿美元 backlog 建立在约 350 亿美元债务之上，Oracle 5530 亿美元 RPO 中 54% 系单一客户 OpenAI，资本栈的循环融资放大了这一脆弱。论断 4（利润池在卖水人）由第一层与第三层 REIT 的利润率验证：Vertiv 订单 backlog 翻倍至 150 亿美元、EQIX 维持 51% EBITDA，而第四层 neocloud 普遍负净利。论断 5（物理墙锁定 alpha）的载体在第一层的不可采购环节（变压器、液冷快接头）与第零层的并网容量。
+
+| 论断 | 主要验证位置（产业链层级 + 玩家）| 次要验证 / 反驳信号 |
+|---|---|---|
+| 论断 1 电力命门 | 第零层（并网队列 2600GW + 变压器 160 周）| 反驳：若 ERCOT 大负荷大量取消，需求或虚高 |
+| 论断 2 矿工重定价 | 第三层（IREN/CIFR/WULF 契约化租约）| 反驳：BTC 反弹使矿工回归挖矿、转型停滞 |
+| 论断 3 neocloud 脆弱 | 第四+七层（CRWV 债务·ORCL 客户集中）| 次要：backstop 质量分化（Google 之于 WULF）|
+| 论断 4 利润在卖水人 | 第一+三层（VRT/EQIX 利润率）| 次要：REIT 估值已不便宜（EQIX PE 74）|
+| 论断 5 物理墙 alpha | 第一层（变压器/液冷）+ 第零层（电力）| 反驳：SST 等技术若快速量产、缓解交期 |
+
+---
+
+# 五、价值链与利润池
+
+*这一节回答："这个产业的钱从哪来到哪去？最终落在谁的口袋？"*
+
+如果要用一句话概括这个产业的利润分布，那就是：钱从超大规模厂商的资本开支洪流流出，沿着芯片、物业、neocloud 一路向下，但利润最终沉淀在收过路费的 REIT 和卖铲子的设备商手里，neocloud 处在收入最高、利润最薄、杠杆最重的夹层。2026 年五大云约 6900 亿美元资本开支是整条链的源头活水，其中约 60%-70% 流向芯片层（Nvidia 等），剩余流向物业、电力、建筑。但芯片是一次性采购，真正能沉淀为长期、可预测利润的，是那些收取 15 年租金的物业方和供应不可替代设备的卖水人。这就是为什么 EQIX 能维持 51% EBITDA、Vertiv 订单翻倍，而 CoreWeave 在 994 亿 backlog 之上仍录得调整后净亏损 5.89 亿美元。
+
+## 5.1 价值传导 / 上下游利润流图
+
+下图把"超大规模厂商约 6900 亿美元年度资本开支 → 各层拆分 → 最终利润沉淀点"完整还原。钱怎么从买家流到上游、又最终聚集在哪几个口袋，是理解整个产业利润迁移方向的关键。
+
+<!--VIZ:valueflow-->
+```
+┌────────────────────────────────────────────────────────────────────────────────┐
+│   ↓↓↓ AI 数据中心 2026 年度资金流总览（五大云资本开支 ~$690B 为源头）↓↓↓        │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+  【资金源头 — 五大云资本开支 ~$690B/年】（AWS $200B·Google $175-185B·
+        ╲   Microsoft $190B·Meta $115-135B·Oracle $50B）
+         ╲   + OpenAI/Anthropic 等模型层算力承诺（Stargate $300B 5年）
+          ▼
+ ┌────────────────────────────────────────────────────────────────────┐
+ │  ① 芯片层 GPU/ASIC  ~$450B 采购 / Nvidia 净利率 ~50% ⭐⭐⭐⭐⭐       │ ◄── 一次性
+ │     • Nvidia 主导 + 自研 ASIC 分流（TPU/Trainium/Maia）             │     最大支出
+ │     • 但属半导体邻接层，且超大规模自研在侵蚀                          │
+ └─────┬──────────────────────────────────────────────────────────────┘
+       │  剩余 ~$240B 流向物业/电力/建筑
+       ▼
+ ┌────────────────────────────────────────────────────────────────────┐
+ │  ② 物业/REIT 层  租金年化 ~$133B / EQIX 净利率高·51% EBITDA ⭐⭐⭐⭐⭐│ ◄── 利润池 #1
+ │     • Equinix(EQIX) 51% EBITDA·DLR 批发规模 │ AI-native APLD         │     确定性最高
+ │     • 矿工转型 IREN/CIFR/WULF：电力换 15 年租约 = 利润正在转固        │
+ │     ⭐ 关键：收过路费旱涝保收，不承担 GPU 折旧风险                     │
+ └─────┬──────────────────────────────────────────────────────────────┘
+       │
+       ▼
+ ┌────────────────────────────────────────────────────────────────────┐
+ │  ③ Neocloud 层  收入高 / 利润为负 / 杠杆最重 ⭐⭐                     │ ◄── 夹层
+ │     • CoreWeave $99B backlog 但调整后净亏 $589M/季·债务 $35B          │     代客泊车
+ │     • Oracle OCI RPO $553B 但 capex $50B·FCF 转负                     │
+ └─────────────────────────────────────────────────────────────────────┘
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+   平行流：与主链并行（卖水人 + 资本栈）
+
+ ┌────────────────────────────────────────────────────────────────────┐
+ │  ④ 电力冷却设备（卖铲子）Vertiv 订单 $15B·EPS +83% ⭐⭐⭐⭐⭐          │ ◄── 利润池 #2
+ │     • Vertiv(VRT)·Eaton(ETN)·变压器 │ 高确定性 + 物理墙保护          │     卖水人最稳
+ └─────────────────────────────────────────────────────────────────────┘
+
+ ┌────────────────────────────────────────────────────────────────────┐
+ │  ⑤ 资本栈（收融资费）私募信贷·GPU 抵押 ABS·Google backstop ⭐⭐⭐⭐   │ ◄── 利润池 #3
+ │     • Blackstone/BlackRock 收 GPU 抵押债利息 │ 但承担尾部信用风险      │
+ └─────────────────────────────────────────────────────────────────────┘
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ⭐⭐⭐⭐⭐ 钱最终沉淀在哪？利润池真正聚集的 4 个位置
+  ┌────────────────────────────────────────────────────────────────────┐
+  │  1) 芯片层 Nvidia（半导体邻接，不在本组合主仓）  净利率 ~50% ⭐⭐⭐⭐⭐│
+  │  2) 物业/REIT（EQIX/DLR + 持电力的矿工转型）     确定性最高 ⭐⭐⭐⭐⭐│
+  │  3) 电力冷却设备（Vertiv/Eaton + 紫苏叶变压器）  物理墙护城 ⭐⭐⭐⭐⭐│
+  │  4) 资本栈（私募信贷收息）                        高息但担风险 ⭐⭐⭐⭐│
+  └────────────────────────────────────────────────────────────────────┘
+  Neocloud 层收入最高却利润为负、杠杆最重，估值已 price-in 完美执行。
+```
+
+**价值传导图一句话解读**：AI 数据中心产业是「**源头资本开支 $690B → 芯片一次性 $450B → 物业租金 $133B 厚利 → neocloud 收入高薄利重债 → 平行的设备卖铲子高确定 + 资本栈高息担险**」的多层利润传导结构。最反常识的判断是：收入最高的 neocloud 不是利润池，利润沉淀在收过路费的物业方和卖铲子的设备商，以及承担尾部风险换取高息的资本栈。这与论断 4 完全一致。
+
+## 5.2 链节利润池详表
+
+更具体地看，整个产业的利润可以按链节拆解如下：
+
+| 链节 | 营收特征 | 利润特征 | 确定性 | 利润中心 |
+|---|---|---|---|---|
+| 芯片 GPU/ASIC | 一次性采购最大 | 净利率 ~50% | 高（但自研侵蚀）| Nvidia |
+| 物业/REIT | 15 年租金可预测 | EQIX 51% EBITDA | 最高 | EQIX/DLR + 持电矿工 |
+| 电力冷却设备 | 订单 backlog 翻倍 | EPS +83% | 高（物理墙）| Vertiv/Eaton |
+| Neocloud | backlog 近千亿 | 调整后净亏损 | 低（执行风险）| 暂无（搏兑现）|
+| 资本栈 | 利息收入 | 高息 | 中（担信用险）| 私募信贷 |
+| 电力发电 | PPA 长约 | 公用事业利润率 | 高 | CEG/VST/GEV |
+
+这张表揭示了一个常被忽视的事实：在一个需求爆炸的产业里，收入增速最快的环节（neocloud）恰恰是利润最差、风险最高的环节，而看似平淡的"包租公"和"卖铲子"才是真正旱涝保收的利润池。这是基础设施类产业的普遍规律：在淘金热中，稳定赚钱的不是淘金者，而是卖铲子和提供住宿的人。Neocloud 的高 backlog 本质是把未来收入提前贴现到当下估值，但兑现这些 backlog 需要完美的执行、稳定的融资和不被自研芯片颠覆的客户，任何一环出问题都会让高 PS 估值崩塌。
+
+未来 3 年，利润池将进一步向"持有稀缺电力的物业方"集中。随着电力约束加剧，"已通电土地"的稀缺溢价会扩大，这是矿工转型标的最大的看涨期权。与此同时，neocloud 层会经历残酷的分化，契约质量高、backstop 强、久期匹配好的会活下来并被重定价为基础设施，而靠故事和高杠杆撑估值的会在债务墙前出清。
+
+---
+
+# 六、关键 link 深度档案
+
+*这一节是研究的"肉"——对 8 个 Tier 1 link 写完整深度档案。*
+
+下面对 8 个 Tier 1 link 展开深度分析，从最高优先级排到最低。每个 link 包含：是什么 + 为什么是命脉；谁在玩 + 谁卡在哪；1 级 vs 2 级估值错配；推荐动作与入场点。
+
+---
+
+## 6.1 Link 1: 电力与并网（真命门 · 物理稀缺）
+
+**速览**：全链最硬约束 · 估值判断：1级电力股已重估/2级并网容量未充分定价 · 推荐动作：经矿工转型间接持有"已通电土地" · 优先级 P0 · Top 标的 CEG/VST/GEV（直接）+ 矿工转型（间接）
+
+**对应论断**：直接验证论断 1（电力是真命门）+ 间接支撑论断 2（矿工的电力护城河）
+
+电力与并网是这条产业链最上游、也最被低估的命脉。判断它是真命门的核心证据，是约束已经从"芯片买不买得到"切换到"电力接不接得上"。截至 2026 年初，美国并网队列堆积约 2600GW 待批发电与储能项目，ERCOT 第一季度单季收到 198GW 大负荷申请，其大负荷队列总量 410GW、数据中心占 87%。一个项目从申请到通电平均超过 7 年，且瓶颈已从并网队列本身下移到下游：变压器交期从 2023 年的约 140 周拉长到 2026 年的 160 周以上，输电线路、变电站、供应链成为新的卡点。这意味着，即便资本和芯片充足，电力也会成为决定数据中心能否落地的唯一标尺。
+
+这一约束催生了一个深刻的范式转变：超大规模厂商正绕过公共并网队列，自建"表后电源"（behind-the-meter）。控制美国 42% 数据中心容量的 AWS、Microsoft、Google 凭借自筹数十亿美元能源基础设施的能力，绕过了卡住小型托管商的公共队列。Bloom Energy 的调研预计，到 2030 年约三分之一的美国数据中心可能完全依赖现场发电。这把电力从"采购项"变成了"建设项"，谁能更早锁定电力，谁就能更快、更大规模地部署算力。
+
+谁在玩，谁卡在哪？直接受益者是手握核电与稳定基荷的公用事业：Constellation Energy（CEG，核电）、Vistra（VST）、NextEra（NEE）已被市场作为"AI 电力股"大幅重估。设备侧 GE Vernova（GEV，燃气轮机）、西门子能源订单饱满，燃气轮机交期同样拉长。但最稀缺、也最未被充分定价的，是"已通电的电力容量"本身：它没有独立 ticker，体现为持有这一资产的主体的护城河。这正是矿工转型标的的价值所在，它们用过去七年为挖矿圈下的、已经并网的电力，成了超大规模厂商和 neocloud 争抢的对象。
+
+1 级 vs 2 级估值错配集中在这里。1 级的电力股（CEG/VST）已经被作为 AI 受益者重估，估值不再便宜。但 2 级的"并网容量"价值，市场定价并不充分。当一个 GW 级园区要 7 年才能通电，一块"现成已通电"的土地，其稀缺溢价应远高于市场当前给矿工转型标的的隐含定价。Galaxy Digital 在 West Texas 的 Helios 园区已获 ERCOT 批准超 1.6GW 容量，Hut 8 在 Beacon Point 已签 1GW 并网协议，这些"已通电容量"是比 GPU 更稀缺的资产，却常被市场用矿工的估值体系打折。
+
+风险方面有五点需警惕。第一，ERCOT 自己也在对冲，称 2026 年夏季峰值需求可能落在 90.5GW 至 98GW，远低于长期预测嵌入的 112GW，暗示大负荷或大量取消。第二，前 FERC 顾问指出 ERCOT 大负荷队列中"相当比例"项目已被取消。第三，电价上涨已转嫁给居民，PJM 区域 6700 万人今夏被多收 94 亿美元电费，政治反弹风险上升。第四，固态变压器（SST）等新技术若快速量产，可能缓解交期、削弱稀缺性。第五，并网政策（FERC 对 PJM 的新规）可能改变大负荷接入规则。
+
+为方便事实速查，关键数据汇总如下：
+
+| 维度 | 数据 |
+|---|---|
+| 美国并网队列 | ~2600GW 待批（2026 初）|
+| ERCOT 大负荷队列 | 410GW（数据中心占 87%）|
+| 并网周期 | 平均 >7 年（含通电后等待）|
+| 变压器交期 | 160 周（2023 年 140 周）|
+| 美国数据中心容量 | 24GW（2026）→ 100GW（2030）|
+| PJM 居民电费增量 | +$94 亿（今夏）|
+
+| 关键玩家 | 国 | 上市 | Ticker | 市值/估值 | 角色 |
+|---|---|---|---|---|---|
+| Constellation Energy | 美 | 是 | CEG | 大盘核电股 | 1 级电力（已重估）|
+| Vistra | 美 | 是 | VST | 大盘电力 | 1 级电力 |
+| GE Vernova | 美 | 是 | GEV | 大盘设备 | 燃气轮机龙头 |
+| NextEra Energy | 美 | 是 | NEE | 大盘 | 电网/可再生 |
+| 已通电容量 | 美 | — | （无）| 体现为矿工护城河 | 2 级（未充分定价）|
+
+> 🌿 **紫苏叶标注**：本 link 的金枪鱼是 CEG/GEV（人尽皆知的 AI 电力股），紫苏叶是"已并网的电力容量"本身（不可外购、无独立 ticker、体现为矿工转型标的的护城河）+ 燃气轮机产能（GEV 交期拉长，但 GEV 非微小市值）。
+
+**推荐动作与入场**。本 link 的最佳表达不是直接买已被重估的电力股，而是经矿工转型标的间接持有"已通电土地"这一未充分定价的 2 级资产（见 §6.4）。直接电力股 CEG/VST 可作组合稳定器，但弹性有限。关键 KPI 是各标的"已并网 + 已签合同"的 GW 数，这是比 GPU 数量更硬的护城河指标。M3 深研入口优先 Galaxy（GLXY，1.6GW 已批）与 MARA（自建燃气电厂 Long Ridge）。
+
+---
+
+## 6.2 Link 2: 电力与冷却设备（卖铲子 · 紫苏叶富集层）
+
+**速览**：picks-and-shovels 最稳利润池 · 估值判断：1级 Vertiv 已涨多/2级变压器液冷紫苏叶未充分挖掘 · 推荐动作：Vertiv 作核心卖水人 + 紫苏叶 watchlist · 优先级 P0 · Top 标的 VRT/ETN
+
+**对应论断**：直接验证论断 4（利润在卖水人）+ 直接验证论断 5（物理墙 alpha）
+
+电力与冷却设备是整条链确定性最高的利润池，也是紫苏叶最富集的一层。它的命脉在于：当机柜功率从十年前的约 30MW 跃升到今天的 300MW 至 GW 级，电力分配、热管理从"配套"变成了"决定能否落地"的核心，而这些设备恰好处在物理墙保护的环节。Vertiv 2026 年第一季度收入 26.5 亿美元、调整后每股收益同比增长 83%、项目 backlog 翻倍至超 150 亿美元（约覆盖 12 至 18 个月前瞻收入），管理层把 2026 年指引上调至 135 亿至 140 亿美元净销售额，隐含 30% 有机增长。这是确定性利润池的典型特征：需求由超大规模资本开支驱动，供给受物理墙保护。
+
+这一层的核心 know-how 在于高密度电力与液冷的系统集成。随着算力密度飙升，传统风冷已无法满足，直接液冷、冷板、浸没式冷却加速渗透。Vertiv 通过 2026 年收购 Strategic Thermal Labs（冷板设计）和 ThermoKey（热交换）补强液冷能力，定位为"端到端电力 + 冷却"的整合者。其供应链覆盖 92 个国家、超 1.7 万家供应商，这种规模本身就是壁垒。但真正的紫苏叶不在 Vertiv 这种大市值整合者身上，而在更上游、买不到的环节。
+
+谁卡在哪？三个紫苏叶级 chokepoint 值得下钻。第一是变压器与开关柜：交期 160 周、由日立能源、西门子能源、Eaton 等少数玩家供应，是物理墙环节，但这些龙头并非微小市值。第二是液冷的快接头（quick-disconnect couplings），由瑞士的 Staubli、美国的 CPC 等少数厂商垄断，Staubli 为私有公司，是典型的"市值不可见但绝对垄断"的紫苏叶，无公开 ticker（→需一级/专业终端补）。第三是固态变压器（SST），Heron Power、DG Matrix、Amperesand 等初创在做，若量产可大幅缩短交期，但均为私有（→需补）。按 chokepoint 分类优先级判断，这些环节中变压器/开关柜属"专用件 + 长交期"（含金量中高），液冷快接头属"专用件 + 工艺 know-how"（含金量高），而通用钢材/铜属可采购材料（使能层、非命门）。
+
+1 级 vs 2 级估值错配。1 级的 Vertiv（VRT）已经被市场作为 AI 卖铲子充分定价，估值不便宜，但其确定性和物理墙护城河支撑了高估值的合理性。2 级的紫苏叶（液冷快接头、SST）则因多为私有、市值不可见，市场无法定价，这是真正的信息差所在，但也意味着散户难以直接持有。错配的本质是：最确定的利润池（设备）已被部分定价，最不可替代的紫苏叶（私有专用件）买不到。
+
+风险有五点。第一，超大规模资本开支若暂停，设备订单会随之回落。第二，组件供应瓶颈本身可能拖累 backlog 转化。第三，高估值放大任何指引不及预期的下行。第四，SST 等新技术若颠覆传统变压器，现有龙头的交期溢价会消失。第五，关税与供应链地缘风险（92 国供应链）。
+
+| 维度 | 数据 |
+|---|---|
+| Vertiv 2026Q1 收入 | $26.5 亿 |
+| Vertiv 项目 backlog | >$150 亿（翻倍）|
+| Vertiv 2026 指引 | $135-140 亿（+30% 有机）|
+| 变压器交期 | 160 周 |
+| 机柜功率演进 | 30MW → 300MW-GW |
+| Vertiv 供应链 | 92 国 / >1.7 万供应商 |
+
+| 关键玩家 | 国 | 上市 | Ticker | 角色 | 紫苏叶度 |
+|---|---|---|---|---|---|
+| Vertiv | 美 | 是 | VRT | 端到端电力+冷却整合 | 金枪鱼 |
+| Eaton | 美 | 是 | ETN | 开关柜/电力管理 | 金枪鱼 |
+| 日立能源/西门子能源 | 日/欧 | 部分 | SIEGY | 变压器 | 中高 |
+| Staubli | 瑞士 | 私有 | →需补 | 液冷快接头 | 🌿 高 |
+| Heron/DG Matrix | 美 | 私有 | →需补 | 固态变压器 SST | 🌿 期权 |
+
+> 🌿 **紫苏叶标注**：金枪鱼是 Vertiv（人尽皆知的 AI 卖铲子），紫苏叶是液冷快接头（Staubli 瑞士私有，垄断高密度液冷的物理接口）与固态变压器初创（私有，若量产颠覆交期）。这些是"买不到的专用件 + 工艺 know-how"，含金量高于可采购的变压器钢材。
+
+**推荐动作与入场**。Vertiv 是本 link 唯一可直接、流动性充足地表达"AI 卖铲子"的标的，适合作组合中确定性较高的一仓，但需在估值回调时入场而非追高。紫苏叶（快接头、SST）多为私有，列入 watchlist，跟踪其是否上市或被并购。关键 KPI 是 Vertiv 的 book-to-bill 与 backlog 覆盖月数。M3 深研入口优先 Vertiv（VRT）。
+
+---
+
+## 6.3 Link 3: 数据中心 REIT / 包租公（确定性利润池）
+
+**速览**：旱涝保收的过路费 · 估值判断：1级 EQIX/DLR 估值已不便宜但确定性最高 · 推荐动作：核心配置 EQIX + DLR · 优先级 P0 · Top 标的 EQIX/DLR/AMT/IRM
+
+**对应论断**：直接验证论断 4（利润在卖水人）
+
+数据中心 REIT 是这条链上确定性最高的利润池，本质是"收过路费的包租公"。它的命脉在于：在一个需求爆炸、供给受电力约束的市场里，谁拥有现成的、已通电的、可租赁的机房空间，谁就握有强大的定价权。Equinix（EQIX）2026 年第一季度收入 24.4 亿美元、同比增长 10%、创纪录的 3.78 亿美元首季年化新签订单、调整后 EBITDA 利润率 51%，并把 2026 年 AFFO 指引上调至 42.0 亿至 42.8 亿美元、隐含 9% 至 11% 同比增长。这种利润率和增长的组合，是 neocloud 无法企及的。
+
+供给极度紧张是定价权的根基。据 JLL 研究，美国主要数据中心市场空置率在 2026 年初维持在历史低位，最重要的北弗吉尼亚市场可用裸壳容量低于 5%。租户行为反映了这种稀缺：AI 租户签更大体量、更长期限（15 年已成常态而非例外），并接受在设施交付前 24 至 36 个月预租。Digital Realty 创纪录的 200MW 夏洛特租约、Applied Digital 75 亿美元的 Delta Forge 1 超大规模交易，都是这种行为模式的体现。
+
+EQIX 与 DLR 走的是不同路线。Equinix 的差异化在于互联密度，它出租的不只是兆瓦，而是兆瓦加上租户连接云、运营商和彼此的"网络会议室"，这个护城河是它能维持 51% EBITDA 利润率（批发同行约 40%）的原因。Digital Realty 则围绕批发托管，把大块空间以更长期限、更低单价租给单一租户，其 PlatformDIGITAL 把托管、互联、管理服务捆绑，提高了已部署租户的切换成本。American Tower（AMT）与 Iron Mountain（IRM）则是更边缘的数据中心暴露，AMT 主业是通信铁塔，IRM 从文档存储向数据中心延伸。过去 12 个月，DLR、EQIX、IRM 总回报分别为 39%、41%、45%，跑赢大盘 REIT。
+
+1 级 vs 2 级估值错配。这一层不存在明显的 1 级/2 级错配，因为 REIT 本身就是高度透明、被充分覆盖的资产。真调显示 EQIX 市销率约 11 倍、PE 约 74 倍，DLR 市销率约 10.5 倍、PE 约 49 倍，AMT 市销率约 8.2 倍，IRM 市销率约 5.2 倍但 PE 高达 137 倍（盈利质量较弱）。估值不便宜，但相对 neocloud 的负净利和重债，REIT 的确定性溢价是合理的。这一层的价值不在"找错配"，而在"用合理价格买确定性"。
+
+风险有五点。第一也是最大的，是电力而非需求：公用事业无法足够快地交付新变电站容量，REIT 中已锁定电网接入和 PPA 的拥有优势。第二，技术过时风险，legacy 机房无法支持高密度 AI 负荷，需改造或面临租户流失。第三，利率higher-for-longer 压制 REIT 估值。第四，AI 需求若证伪，预租的长约面临交易对手风险。第五，超大规模厂商自建数据中心绕过 REIT。
+
+| 维度 | 数据 |
+|---|---|
+| 北弗吉尼亚空置率 | <5% |
+| EQIX 2026Q1 收入 | $24.4 亿（+10%）|
+| EQIX EBITDA 利润率 | 51% |
+| EQIX 2026 AFFO 指引 | $42.0-42.8 亿（+9-11%）|
+| AI 租约典型期限 | 15 年（预租 24-36 月）|
+| EQIX/DLR/IRM 12M 回报 | 41% / 39% / 45% |
+
+| 关键玩家 | 国 | 上市 | Ticker | 市值 | PS / PE |
+|---|---|---|---|---|---|
+| Equinix | 美 | 是 | EQIX | $106B | 11.1x / 74x |
+| Digital Realty | 美 | 是 | DLR | $66B | 10.5x / 49x |
+| American Tower | 美 | 是 | AMT | $88B | 8.2x / 31x |
+| Iron Mountain | 美 | 是 | IRM | $38B | 5.2x / 137x |
+| Applied Digital | 美 | 是 | APLD | $12B | 36x（见 §6.4）|
+
+**推荐动作与入场**。EQIX 与 DLR 是组合中"确定性卖水人"的核心配置，适合作为承接 AI 需求但不承担 neocloud 执行风险的底仓。EQIX 的互联护城河使其更适合长持，DLR 的批发规模在 AI 大单时代有更强经营杠杆。关键 KPI 是空置率、续约提价幅度、AFFO 增速。M3 深研入口优先 EQIX（EQIX）。
+
+---
+
+## 6.4 Link 4: AI-native 开发商 / 矿工转型（期权重定价核心）
+
+**速览**：本研究最大 alpha 所在 · 估值判断：1级仍按矿工定价/2级契约化租约应享 REIT 估值 · 推荐动作：精选契约质量最高的 IREN/CIFR/WULF/APLD · 优先级 P0 · Top 标的 IREN/CIFR/WULF/APLD/HUT/GLXY/CORZ
+
+**对应论断**：直接验证论断 2（矿工重定价）+ 间接验证论断 1（电力护城河）
+
+这是本研究最大的 alpha 所在，也是核心判断 2 的主战场。这一层的命脉在于一个简单而深刻的置换：拥有电力的比特币矿工，把"可随时中断的挖矿负荷"换成"15 年 take-or-pay 的 AI 租约"，从而把估值从矿工体系迁移到数据中心 REIT 体系。数据显示，据 CoinShares，上市矿工已累计签下超 700 亿美元 AI/HPC 合同，AI 收入占比预计从约 30% 升至 2026 年底约 70%。这不是估值泡沫，而是资产属性的真实改变：同样的电力 + 机房，签下契约化长约后，现金流的可预测性发生了质变。
+
+逐家看契约进展。IREN（前 Iris Energy）是其中体量最大、转型最彻底的，它与 Microsoft 签下 97 亿美元、5 年期、76000 块 Nvidia GB300 GPU 的合约，在 Childress, Texas 园区部署 200MW，项目级 EBITDA 利润率达 85%，且刻意零持有比特币。TeraWulf（WULF）签下总额 128 亿美元 HPC 合同，由 Google 支持的 Fluidstack 锚定，Google 提供约 32 亿美元 backstop 并获约 14% 股权，第一季度 HPC 收入 2100 万美元已占总收入 3400 万的多数。Cipher（CIFR）签下与 AWS 的 55 亿美元、300MW、15 年租约，加上 Fluidstack 的 300MW，合计约 93 亿美元契约收入，3.2GW 开发管线。Applied Digital（APLD）与 CoreWeave 签下约 110 亿美元的 Ellendale 租约（400MW），并执行七份长约、三个园区、三家超大规模租户、约 230 亿美元预期租金。Hut 8（HUT）签下 98 亿美元德州租约（可至 251 亿美元），加 Anthropic 高达 180 亿美元、2295MW 协议，8.6GW 开发管线。Galaxy（GLXY）的 Helios 园区获 ERCOT 批准超 1.6GW，与 CoreWeave 签 15 年、800MW、约 45 亿美元承诺。Core Scientific（CORZ）在拒绝 CoreWeave 的 90 亿美元收购后保持独立，仍持有与 CoreWeave 的 12 年、约 102 亿美元租约。
+
+1 级 vs 2 级估值错配是这一层的精华。市场对同类资产给出了相差十倍的估值：真调显示 WULF 市销率约 75 倍、CIFR 约 47 倍、HUT 约 47 倍、APLD 约 36 倍、IREN 约 27 倍，而仍以挖矿为主的 BTDR 约 6 倍、CLSK 约 5.7 倍、MARA 约 5.8 倍。这个差异几乎全部来自契约化 AI 收入的可见度。但错配尚未走完：当这些标的的 AI 收入在 2026 至 2027 年陆续转固、确认为利润表上的稳定现金流，市场会进一步把它们从"高 PS 的故事股"重定价为"享 REIT 倍数的基础设施"。值得注意的是，APLD 的 EV/现金约 7.3 倍、IREN 约 10.1 倍，在这组里相对不贵，而 WULF 的 EV/现金约 5.8 倍也不算高，说明高 PS 主要源于当前收入基数低、而非企业价值虚高，这正是"收入即将转固"的重定价前夜。
+
+甄别的关键在契约质量与 backstop 强度。并非所有矿工转型都同等优质：TeraWulf 和 Cipher 的 Fluidstack 租约有 Google backstop（信用增级），IREN 的客户是 Microsoft 直签（最高信用），APLD 是母公司担保（信用较弱），Hut 8 的 Anthropic 协议含大量或有条件（执行不确定）。投资者应优先 Microsoft/AWS 直签或 Google backstop 的标的，规避纯母公司担保 + 高或有条件的。
+
+风险有五点。第一，执行风险：这些是基础设施级债务，IREN 背负 37 亿美元可转债、WULF 总债务 57 亿美元，赌的是 AI 收入兑现得够快以偿债。第二，需求风险：若 Google/Microsoft 放缓算力需求，最高杠杆者承压。第三，BTC 反弹诱使部分公司回归挖矿、转型停滞。第四，backstop 随时间递减（Google 之于 Fluidstack），后期信用增级减弱。第五，建设延期（变压器、并网）拖累交付。
+
+| 维度 | 数据 |
+|---|---|
+| 上市矿工累计 AI 合同 | >$70B |
+| AI 收入占比 | ~30%（当前）→ ~70%（2026 底）|
+| IREN Microsoft 合约 | $9.7B / 200MW / 85% EBITDA |
+| WULF Fluidstack+Google | $12.8B 合同 / $3.2B backstop |
+| CIFR AWS+Fluidstack | $9.3B 契约 / 3.2GW 管线 |
+| APLD CoreWeave | $11B / 400MW Ellendale |
+
+| 关键玩家 | 国 | Ticker | 市值 | PS / EV现金 | 契约质量 |
+|---|---|---|---|---|---|
+| IREN | ◆ 美（澳籍）| IREN | $21B | 27x / 10.1x | Microsoft 直签（最高）|
+| TeraWulf | 美 | WULF | $13B | 75x / 5.8x | Google backstop（高）|
+| Cipher | 美 | CIFR | $10B | 47x / 19.4x | AWS+Google（高）|
+| Applied Digital | 美 | APLD | $12B | 36x / 7.3x | 母公司担保（中）|
+| Hut 8 | 美/加 | HUT | $13B | 47x / 85x | Anthropic 或有（中低）|
+| Galaxy | 美 | GLXY | $12B | — | CoreWeave 1.6GW（中高）|
+| Core Scientific | 美 | CORZ | $9B | 24x / 9.7x | CoreWeave 12 年（高）|
+
+> 🌿 **紫苏叶标注**：本 link 的金枪鱼是市值最大、最知名的转型标的，紫苏叶是它们底下"已并网的电力容量"本身——这是不可外购、决定一切的隐形资产。同样市值，谁的"已通电 + 已签约"GW 数更高、契约质量更优，谁就握有更厚的紫苏叶。
+
+**推荐动作与入场**。这一层是组合中"期权重定价"的核心仓，但必须精选而非一篮子买入。最高确信度是 IREN（Microsoft 直签 + 零 BTC + 85% EBITDA）与 CIFR（AWS+Google + EV/现金合理）。WULF（Google backstop + EV/现金仅 5.8x）弹性最大。APLD（EV/现金仅 7.3x，相对便宜）值得关注。规避纯故事 + 高或有条件标的。关键 KPI 是"已签约 GW 数 + 契约 backstop 质量 + AI 收入转固进度"。M3 深研入口优先 IREN、CIFR、WULF。
+
+---
+
+## 6.5 Link 5: 矿工纯血 / 混合（power ownership play）
+
+**速览**：转型较慢但持电力期权 · 估值判断：1级仍按矿工低估值/2级电力资产未重定价 · 推荐动作：选择性配置 MARA/RIOT，规避纯故事 · 优先级 P1 · Top 标的 MARA/RIOT/CLSK/BTDR
+
+**对应论断**：间接验证论断 2（矿工重定价的尾部）+ 验证论断 1（电力护城河）
+
+这一层是矿工转型光谱中转型较慢、仍以挖矿为主但握有电力期权的一端。它的命脉同样是电力，但商业模式仍在从"挖矿"向"卖算力/卖电力"过渡，因此估值显著低于已签大单的同行。MARA 的核心论点是电力所有权：下一阶段数字基础设施的价值由对电力的控制塑造，可用的已并网能源是 AI 算力增长的约束。MARA 通过收购 FTAI 的 Long Ridge Energy（485MW 燃气电厂，H2 2026 增至 505MW）建立 PJM 区域的 AI 数据中心园区，并通过 Starwood 合作推进超 1GW HPC/AI 战略，退役约 30% 可转债。这是"自己发电 + 灵活转换负荷"的路线。
+
+RIOT 以与 AMD 的 10 年租约（Rockdale 站点，25MW 起步分阶段交付）锚定可信度，把自己重新定位为"大规模数据中心建设者"而非单纯矿工，并已开始从 AMD 租约确认收入。CleanSpark（CLSK）明确告诉投资者"不再是单一业务"，在德州 Brazoria 收购 447 英亩土地、规划 300MW（可扩至 600MW）数据中心，定位 AI/HPC。Bitdeer（BTDR）则兼有挖矿、卖矿机（自研 ASIC）和数据中心业务，转型节奏更分散。
+
+1 级 vs 2 级估值错配在这里更隐蔽。值得注意的是，真调显示这组的市销率显著低于已签大单的同行：MARA 约 5.8 倍、RIOT 约 14.6 倍、CLSK 约 5.7 倍、BTDR 约 6 倍，EV/现金 MARA 约 13.6 倍、CLSK 约 22 倍、BTDR 约 23 倍。市场仍主要按"矿工 + BTC 持仓"给它们定价，尚未充分计入其电力资产的潜在重定价价值。但这种"便宜"是有道理的：它们的 AI 合同要么尚未签下（CLSK 仅有土地），要么体量小（RIOT 仅 25MW 起步），转型可见度远低于 §6.4 的标的。错配的本质是"用矿工估值买了一份电力转型期权"，但这份期权的行权时间和概率都不确定。
+
+风险有五点。第一，这些公司仍持有大量 BTC 库藏（MARA、RIOT、Hut 8、CleanSpark 均在前十大公开持有者之列），BTC 价格波动放大资产负债表波动。第二，挖矿经济恶化，每枚币亏损约 1.9 万美元（2026 年初 BTC 从约 8.7 万跌至约 6.8 万），但全成本含折旧/债务仍在 6 万至 7 万区间。第三，持续稀释风险，业务资本密集需不断投入 ASIC 和扩建。第四，转型执行不确定，CLSK 仅有土地、RIOT 仅 25MW，兑现需时间。第五，与大单同行的竞争加剧，优质租户被先行者锁定。
+
+| 维度 | 数据 |
+|---|---|
+| MARA Long Ridge 电厂 | 485MW（→505MW H2 2026）|
+| RIOT AMD 租约 | 10 年 / 25MW 起步 |
+| CLSK Brazoria 规划 | 300MW（可扩 600MW）|
+| BTC 挖矿单币亏损 | ~$1.9 万（2026 初）|
+| 全成本含折旧 | $6-7 万/币 |
+| 这组 PS 区间 | 5.7x-14.6x（显著低于大单同行）|
+
+| 关键玩家 | 国 | Ticker | 市值 | PS / EV现金 | 转型可见度 |
+|---|---|---|---|---|---|
+| MARA Holdings | 美 | MARA | $5B | 5.8x / 13.6x | 自建电厂（中）|
+| Riot Platforms | 美 | RIOT | $9.5B | 14.6x / 49.6x | AMD 25MW（低中）|
+| CleanSpark | 美 | CLSK | $4.2B | 5.7x / 22x | 仅有土地（低）|
+| Bitdeer | 新/美 | BTDR | $4.4B | 6x / 23.3x | 分散（低）|
+
+**推荐动作与入场**。这一层是"用矿工估值买电力转型期权"的尾部机会，适合选择性、小仓位配置，而非重仓。MARA（自建燃气电厂 + PJM 园区 + 退债）转型路径最清晰，RIOT（AMD 租约已确认收入）次之，CLSK 和 BTDR 转型可见度低、需观察。关键 KPI 是"AI 合同签约进度 + BTC 持仓占净值比例 + 现金跑道"。M3 深研入口优先 MARA。注意：这一层与 §6.4 的区别在于契约可见度，估值便宜不等于更优，需警惕价值陷阱。
+
+---
+
+## 6.6 Link 6: Neocloud / GPU 云（最脆弱夹层）
+
+**速览**：收入最高利润最薄杠杆最重 · 估值判断：1级已 price-in 完美执行/2级久期错配未充分定价 · 推荐动作：精选龙头 CRWV，规避高杠杆弱 backstop · 优先级 P1 · Top 标的 CRWV/NBIS
+
+**对应论断**：直接验证论断 3（neocloud 脆弱）+ 反向参照论断 4（利润不在此）
+
+Neocloud 是这条链上收入增速最快、却利润最薄、杠杆最重的夹层，也是核心判断 3 的主战场。它的命脉在于一个中介定位：坐在 AI 模型与底层硅之间，提供 GPU 算力批发。CoreWeave（CRWV）CEO 的表述很精准，它"坐在模型与硅之间"，在市场从训练转向推理时，这个定位更重要。CoreWeave 2026 年第一季度收入 backlog 逼近 1000 亿美元（994 亿），1GW 活跃功率、目标 2030 年超 8GW，调整后 EBITDA 11.57 亿美元、56% 利润率。但同期调整后净亏损 5.89 亿美元、调整后营业利润仅 2100 万美元（1% 利润率），背负约 350 亿美元债务。这是 neocloud 的核心张力：爆炸式需求 + 近千亿 backlog，伴随深度净亏损、极薄营业利润、严重依赖 GPU 抵押债的融资模式。
+
+backlog 的来源是几个标志性大单：与 Meta 签约 210 亿美元（至 2032 年）、Jane Street 承诺约 60 亿美元算力 + 10 亿美元股权投资、Nvidia 投资 20 亿美元股权。融资侧，CoreWeave 关闭了 85 亿美元延迟提取定期贷款（首个达投资级的 HPC 基础设施 DDTL）、31 亿美元 DDTL 5.0、12.5 亿美元 2031 年到期优先票据。Nebius（NBIS）是欧洲（荷兰）玩家，与 Microsoft、Meta 签多年合约，近期拿下与 Meta 高达 270 亿美元的第二份大单，目标 2026 年底连接 800MW 至 1GW 功率，在宾州锁定 1.2GW 电力和土地，是全球首批部署 Nvidia Vera Rubin NVL72 的云之一。
+
+1 级 vs 2 级估值错配集中在久期。真调显示 CRWV 市销率约 8.9 倍、EV/现金约 39 倍，NBIS 市销率约 67 倍、PE 约 89 倍。1 级的估值已经把近千亿 backlog 和完美执行 price-in，但 2 级的久期错配风险并未被充分定价：约三分之二的资本开支是 3 至 4 年寿命的 GPU 硬件，却用 15 至 20 年的债务融资，GPU 没有二级市场作抵押品回收。H100 租赁价已从约 8 美元/小时跌至约 2 美元/小时，下一代发布会进一步压低旧 GPU 价值。一旦抵押品价值崩塌，会触发追加保证金、迫使抛售旧 GPU 进入饱和市场，进一步压价。这种"资产-负债久期错配"是 neocloud 估值中最未被定价的尾部风险。
+
+风险有五点，且彼此放大。第一，久期错配：3-4 年资产对 15-20 年债务。第二，循环融资：Nvidia 投资 neocloud、neocloud 又买 Nvidia 芯片，同一美元被算三次需求/收入/抵押。第三，客户集中：少数 whale 客户（Meta、OpenAI）占 backlog 大头。第四，自研芯片：Microsoft Maia、Google TPU、AWS Trainium 若放量，neocloud 的 GPU 抵押品价值和需求被侵蚀。第五，再融资：2026-27 GPU 债务墙是首次真实考验。本研究判断 neocloud 不是利润池而是风险池，超大规模厂商段相对安全，neocloud 和商业运营商段脆弱性显著。
+
+| 维度 | 数据 |
+|---|---|
+| CRWV backlog | $99.4B（逼近千亿）|
+| CRWV 活跃功率 | 1GW → 目标 8GW（2030）|
+| CRWV 调整后净亏损 | -$589M/季 |
+| CRWV 债务 | ~$35B（GPU 抵押）|
+| GPU 寿命 vs 债务久期 | 3-4 年 vs 15-20 年 |
+| H100 租赁价 | $8/hr → $2/hr |
+
+| 关键玩家 | 国 | Ticker | 市值 | PS / EV现金 | 风险点 |
+|---|---|---|---|---|---|
+| CoreWeave | 美 | CRWV | $56B | 8.9x / 39x | 债务 $35B / 客户集中 |
+| Nebius | 荷/欧 | NBIS | $59B | 67x / 6.3x | PS 极高 / 现金厚 |
+| Lambda | 美 | 私有 | →需补 | GPU 抵押 ABS 首发 |
+| Crusoe | 美 | 私有 | →需补 | 高杠杆 |
+
+> 🌿 **紫苏叶标注**：本 link 无传统紫苏叶（neocloud 本身是中游运营商，非垄断瓶颈）。真正的隐形约束是其底层的 GPU 抵押品质量与 backstop 信用，这决定了哪些 neocloud 能熬过债务墙。NBIS 现金厚（EV/现金仅 6.3x）是其相对安全的一面。
+
+**推荐动作与入场**。这一层应以精选 + 对冲为主，而非重仓做多。若要表达 neocloud 多头，CoreWeave 是规模龙头（已达投资级 DDTL、客户最优质），Nebius 现金厚、相对安全。但本研究更倾向把高 PS、弱 backstop、高杠杆的 neocloud 作为对冲做空标的（见 §8）。关键 KPI 是"GPU 折旧政策 + 客户集中度 + 再融资能力 + 自研芯片渗透"。M3 深研入口优先 CRWV（作多空两面研究）。
+
+---
+
+## 6.7 Link 7: Oracle / 第二梯队云（RPO 巨兽 · 客户集中）
+
+**速览**：传统巨头的 AI 豪赌 · 估值判断：1级 RPO 已部分定价/2级客户集中风险未充分折价 · 推荐动作：观察为主，警惕单点风险 · 优先级 P1 · Top 标的 ORCL
+
+**对应论断**：直接验证论断 3（客户集中是 neocloud 式脆弱的另一种形态）
+
+Oracle 是传统软件巨头里 AI 基础设施豪赌最激进的一家，其逻辑介于超大规模厂商与 neocloud 之间。它的命脉在于把 GPU 密集的 OCI（Oracle Cloud Infrastructure）做成第二增长曲线。Oracle 2026 财年第三季度收入 172 亿美元、同比增长 22%，OCI 增长 84%，剩余履约义务（RPO）暴增 325% 至 5530 亿美元，约相当于当前年化收入的 8 倍。CEO Safra Catz 预计 OCI 在 2026 财年增长 77% 至 180 亿美元，2030 年达 1440 亿美元。这个 backlog 主要由与 OpenAI 的 Stargate 项目驱动，Oracle 把 2026 财年资本开支从 350 亿上调至 500 亿美元，主要用于 Nvidia GB300、AMD MI355X 和 4.5GW 的 Stargate 数据中心建设。
+
+但这正是问题所在：客户集中是 Oracle 最大的未对冲风险。约 3000 亿美元、占 RPO 约 54% 系单一客户 OpenAI（通过 Stargate）。如果 OpenAI 的融资或收入增长停滞，Oracle 将持有无法立即重新租赁的定制基础设施。Oracle 的 OCI 增长由少数 whale 客户（OpenAI、Meta、TikTok）驱动，这与 neocloud 的客户集中风险本质相同，只是发生在一家传统巨头身上。事实上，已有报道称 OpenAI 因电力基础设施延误退出 Oracle 的部分 Stargate 扩张，理由是 Nvidia Blackwell 芯片在设施开放时会过时。
+
+1 级 vs 2 级估值错配。事实上，真调显示 ORCL 市值约 6160 亿美元、EV 约 7390 亿美元、市销率约 9.6 倍、PE 约 38 倍、债务高达 1622 亿美元。1 级的市场已经把 RPO 增长部分定价（股价从 2025 年高点回调约 20%），但 2 级的客户集中风险和久期错配并未被充分折价。Oracle 第二财季资本开支单季 120 亿美元、自由现金流转负 100 亿美元、总债务超 1240 亿美元（一年前 890 亿），股价单日跌 15%。市场开始意识到，这个 5530 亿 RPO 的质量取决于 OpenAI 一家的命运。Oracle 辩称多数资本开支用于产生收入的设备，土地建筑电力靠租赁，但客户集中这个核心风险无法被这套辩护化解。
+
+风险有五点。第一，客户集中：OpenAI 占 54% RPO，单点风险极高。第二，久期错配：bespoke 基础设施难以重新租赁。第三，自由现金流转负 + 债务激增：资本开支远超内生现金。第四，执行延误：电力延迟导致 OpenAI 部分退出。第五，估值，尽管回调，PE 38 倍对一家传统软件公司仍不低，且增长高度依赖单一豪赌。
+
+| 维度 | 数据 |
+|---|---|
+| Oracle RPO | $553B（+325%）|
+| OpenAI 占 RPO | ~54%（$300B Stargate）|
+| OCI 2026 增长 | +77% 至 $18B |
+| 2026 资本开支 | $50B（从 $35B 上调）|
+| 总债务 | $124B+（一年前 $89B）|
+| 股价 vs 2025 高点 | -20% |
+
+| 关键玩家 | 国 | Ticker | 市值 | PS / PE | 风险点 |
+|---|---|---|---|---|---|
+| Oracle | 美 | ORCL | $616B | 9.6x / 38x | OpenAI 占 54% RPO |
+
+**推荐动作与入场**。Oracle 的 RPO 故事诱人但客户集中风险被低估，本研究建议观察为主，不宜在当前估值重仓。它本质是一个"高 backlog + 单点客户"的放大版 neocloud 风险，包裹在传统巨头外壳里。若 OpenAI 的资金链和算力消化能力得到验证，Oracle 的长期 thesis 仍成立；反之则面临 bespoke 资产减值。关键 KPI 是"OpenAI 资金链 + Stargate 通电进度 + RPO 兑现率"。M3 深研入口可选 ORCL（作为客户集中风险案例）。
+
+---
+
+## 6.8 Link 8: 超大规模买家 + 自建（需求源 + 自建威胁）
+
+**速览**：最大买家也是自建竞争者 · 估值判断：1级大盘股已充分覆盖/2级自研芯片对中游的颠覆未充分定价 · 推荐动作：底仓配置 GOOGL/AMZN · 优先级 P1 · Top 标的 GOOGL/AMZN
+
+**对应论断**：验证论断 3（自研芯片威胁中游）+ 需求源印证全产业
+
+超大规模厂商是整条链的需求源头，也是最被低估的自建竞争者。它们的命脉双重：既是最大买家（2026 年合计资本开支 7250 亿美元），又通过自研芯片和自建数据中心向上下游渗透。Amazon（AWS）、Alphabet（Google Cloud）、Microsoft（Azure）、Meta 合计约 7250 亿美元资本开支、同比 +77%、75% 投 AI，是整个产业的活水源头。但它们同时在三个方向侵蚀产业链利润：向上自研芯片（Google TPU、AWS Trainium、Meta MTIA、Microsoft Maia）削弱 Nvidia 和 neocloud 的 GPU 抵押品价值；向下自建数据中心绕过 REIT；横向用表后电源绕过公共并网队列。
+
+这种"既是买家又是竞争者"的双重身份，决定了它们在产业链中的特殊地位。一方面，它们的资本开支是所有下游标的的生命线，REIT、neocloud、矿工转型都靠超大规模需求存活。另一方面，它们的自建能力是悬在中游头上的达摩克利斯之剑：Microsoft 已表态主要用自研 Maia 芯片，Google 大规模部署 TPU，AWS 构建 Trainium/Inferentia，Meta 开发 MTIA。如果这些自研芯片放量，CoreWeave 的 GPU 抵押品价值和 Nvidia 的厂商融资都将面临"客户自己造竞品"的暴露。
+
+1 级 vs 2 级估值错配。真调显示 GOOGL 市值约 4.42 万亿美元、市销率约 10.5 倍、PE 约 27.6 倍，AMZN 市值约 2.66 万亿美元、市销率约 3.6 倍、PE 约 31.8 倍。这些是被充分覆盖的大盘股，1 级估值高度有效。2 级的错配在于：市场对它们"自研芯片颠覆中游"的期权价值，以及"资本开支拖累自由现金流"的风险，定价并不充分。亚马逊 2026 年自由现金流预计转负，市场对资本开支的容忍度在下降，财报后 Google、Amazon、Microsoft 股价均回调。这是成长与现金流的拉锯。
+
+风险有五点。第一，资本开支拖累自由现金流，AMZN FCF 转负。第二，AI 投资回报周期长，市场耐心有限。第三，监管（反垄断）对超大规模厂商的压制。第四，自研芯片若不及预期，仍需高价买 Nvidia。第五，宏观（利率、衰退）对资本开支节奏的冲击。
+
+| 维度 | 数据 |
+|---|---|
+| 四大资本开支 2026 | $725B（+77%）|
+| AWS / Google / MSFT / Meta | $200B / $175-185B / $190B / $115-135B |
+| AI 占资本开支 | ~75% |
+| 自研芯片 | TPU/Trainium/Maia/MTIA |
+| 超大规模控美国 DC 容量 | 42% |
+
+| 关键玩家 | 国 | Ticker | 市值 | PS / PE | 自建威胁 |
+|---|---|---|---|---|---|
+| Alphabet | 美 | GOOGL | $4.42T | 10.5x / 27.6x | TPU（最强自研）|
+| Amazon | 美 | AMZN | $2.66T | 3.6x / 31.8x | Trainium |
+| Microsoft | 美 | MSFT | 大盘 | — | Maia |
+| Meta | 美 | META | 大盘 | — | MTIA |
+
+**推荐动作与入场**。超大规模厂商适合作组合的底仓配置，提供 AI 需求的确定性暴露而风险分散。GOOGL（TPU 自研最强 + 估值合理）和 AMZN（AWS 龙头 + PS 仅 3.6x）是首选。它们也是对冲中游 neocloud 风险的天然工具：若自研芯片颠覆中游，超大规模厂商受益、neocloud 受损。关键 KPI 是"资本开支自由现金流平衡 + 自研芯片渗透率 + 云收入增速"。M3 深研入口优先 GOOGL。
+
+---
+
+# 七、地缘与政策约束
+
+*这一节用大段叙事讲产业的国别集中度 + 地缘风险 + 政策窗口。*
+
+AI 数据中心产业的地缘格局高度美国中心化，但关键设备与材料的命门散落在日欧。从需求到资本，美国主导了几乎整条链：超大规模买家全部是美国公司，neocloud 龙头（CoreWeave）、矿工转型标的、REIT、电力股、资本栈（私募信贷）也几乎全部在美国。这与多数硬件产业链"中国制造、美国设计"的格局截然不同，数据中心是少有的"美国从需求到资本全链主导"的产业。但这种主导有两个例外，构成了关键的地缘约束：一是关键设备/材料的命门在日欧（变压器、液冷快接头、ABF 载板），二是政策（电力、并网、关税）成为新的约束变量。
+
+国别矩阵分三视图呈现：上方是 ASCII 世界分布图，按 link × 国家组团勾勒整体格局；中间是精对齐 markdown 矩阵；下方是海外节点延伸表。
+
+## 7.1 ASCII 世界分布图（按 link × 国家分组）
+
+<!--VIZ:geo-->
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│         🌍 AI 数据中心产业 6 国 × N link 世界分布速览（2026-Q2）                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+  美国 — 从需求到资本全链主导
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │ 超大规模: AWS/Google/Azure/Meta/Oracle │ Neocloud: CoreWeave/Lambda    │
+  │ REIT: EQIX/DLR/AMT/IRM │ 矿工转型: IREN/WULF/CIFR/HUT/CORZ/MARA/RIOT   │
+  │ 电力: CEG/VST/NEE/GEV │ 设备: Vertiv/Eaton │ 资本: Blackstone/BlackRock │
+  └──────────────────────────────────────────────────────────────────────┘
+
+  日本 — 关键材料/设备紫苏叶
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │ ABF 载板: 味之素(95% 垄断🌿) │ HBM: 部分 │ 被动元件/材料              │
+  └──────────────────────────────────────────────────────────────────────┘
+
+  欧洲 — 设备 + neocloud 单点
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │ Neocloud: Nebius(荷) │ 变压器: 西门子能源/日立能源 │ 施耐德(法)        │
+  │ 液冷快接头: Staubli(瑞士🌿) │ ASML(荷, 半导体邻接)                     │
+  └──────────────────────────────────────────────────────────────────────┘
+
+  韩国 — HBM 存储
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │ HBM: SK海力士/三星(高带宽存储, AI 芯片必需, 半导体邻接)                │
+  └──────────────────────────────────────────────────────────────────────┘
+
+  台湾 — 代工/封装
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │ 代工: 台积电(GPU/ASIC 制造) │ CoWoS 先进封装(半导体邻接)              │
+  └──────────────────────────────────────────────────────────────────────┘
+
+  中国 — 受限/平行体系
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │ 受出口管制限制, 走平行体系(华为昇腾等), 不在本研究美股标的范围内       │
+  └──────────────────────────────────────────────────────────────────────┘
+```
+
+## 7.2 完整国别 × link 精对齐 markdown 矩阵
+
+| 链节 \ 国别 | 美国 US | 日本 JP | 欧洲 EU | 韩国 KR | 台湾 TW | 其他 |
+|---|---|---|---|---|---|---|
+| 电力/并网 | CEG/VST/GEV（主导）| — | 西门子能源 | — | — | — |
+| 设备/冷却 | Vertiv/Eaton（主导）| — | 日立能源/Staubli🌿 | — | — | — |
+| 芯片 | Nvidia/AMD（主导）| 味之素🌿(ABF) | ASML | SK海力士(HBM) | 台积电(代工) | — |
+| 物业/REIT | EQIX/DLR/AMT/IRM（主导）| — | 部分 | — | — | — |
+| 矿工转型 | IREN/WULF/CIFR/HUT（主导）| — | — | — | — | IREN(澳籍) |
+| Neocloud | CoreWeave/Lambda（主导）| — | Nebius(荷) | — | — | — |
+| 超大规模 | AWS/Google/Azure/Meta（垄断）| — | — | — | — | — |
+| 资本栈 | Blackstone/BlackRock（主导）| — | — | — | — | — |
+
+## 7.3 海外节点延伸表（产业全球化前哨 / 至少 5 行）
+
+| 国家 | 关键节点 | 代表玩家 | 战略意义 |
+|---|---|---|---|
+| 日本 | ABF 载板 | 味之素（95% 垄断）| AI 芯片分子级命门，无替代 |
+| 瑞士 | 液冷快接头 | Staubli（私有）| 高密度液冷物理接口垄断 |
+| 荷兰 | Neocloud + 光刻 | Nebius / ASML | 欧洲唯一规模 neocloud + 光刻命门 |
+| 韩国 | HBM 存储 | SK海力士 / 三星 | AI 芯片高带宽存储必需 |
+| 台湾 | 代工 + CoWoS | 台积电 | GPU/ASIC 制造与先进封装 |
+
+矩阵与延伸表之外还有几个关键节点不能忽视：澳大利亚（IREN 注册地，但业务在美国德州）、加拿大（Hut 8 部分根源）。这些国别延伸主要是注册地或历史根源，实际算力资产几乎都在美国本土，因为美国的电力、土地、客户、资本最集中。这也意味着，这个产业的地缘风险主要不是"跨国供应链断裂"，而是"美国本土的电力、政策、利率"三个变量。
+
+地缘风险评分见下表（按 link 排序）：
+
+| Link | top 国占比 | 风险等级 | 卡在哪个国家 |
+|---|---|---|---|
+| 电力/并网 | 美 ~100% | 中（政策风险）| 美国本土电力/FERC |
+| 芯片 ABF 载板 | 日 95% | 高（单点）| 日本味之素 |
+| 液冷快接头 | 瑞士主导 | 中高 | 瑞士 Staubli |
+| HBM | 韩主导 | 中高 | 韩国 SK海力士 |
+| 矿工转型/REIT | 美 ~100% | 低 | 美国本土 |
+
+最后是 stress-test 情景。本研究判断，对这个美国中心化产业，最大的地缘/政策冲击不在海外，而在美国本土：第一，电价政治反弹（PJM 多收 94 亿电费）可能触发对数据中心的限电或加税；第二，FERC 对大负荷接入的新规可能改变游戏规则；第三，出口管制升级可能影响 Nvidia 对华销售，间接冲击全球 GPU 供需；第四，关税（92 国供应链）推高设备成本；第五，利率 higher-for-longer 压制重资本玩家的融资能力。
+
+| 情景 | 影响最大的 link | 影响幅度 | 替代时间 | 概率（3yr）|
+|---|---|---|---|---|
+| 电价政治反弹/限电 | 电力/物业 | 高 | 难替代 | 中 |
+| 味之素 ABF 断供 | 芯片 | 极高 | 无替代 | 低 |
+| FERC 新规改并网 | 电力/矿工转型 | 中 | 政策依赖 | 中高 |
+| 利率持续高位 | neocloud/矿工 | 高 | — | 中 |
+| 出口管制升级 | 芯片/全球供需 | 中 | — | 中 |
+
+整体看，这个产业的地缘叙事不是"中美脱钩"，而是"美国本土电力 + 日欧关键紫苏叶"的双重约束。投资上，这表明风险主要来自美国政策与利率，而非跨国供应链；alpha 则部分藏在日欧的紫苏叶环节，但这些多为私有、难以直接持有。
+
+---
+
+# 八、投资标的与组合建议
+
+*这一节给基金老板看的——具体到 ticker 的推荐组合。*
+
+基于前面六章的产业链分析与 link 深度档案，本研究的核心投资组合遵循三层逻辑：底仓配置确定性卖水人（REIT + 设备 + 超大规模），核心仓配置持有稀缺电力、契约质量最高的矿工转型，对冲做空久期错配最严重的高 PS neocloud 与纯故事矿工。
+
+| 仓位类型 | 仓位 % | 标的 | Ticker | 国 | thesis 一句话 |
+|---|---|---|---|---|---|
+| 底仓-卖水人 | 12% | Equinix | EQIX | ◆ 美 | 51% EBITDA 互联护城河，收过路费旱涝保收 |
+| 底仓-卖水人 | 8% | Digital Realty | DLR | ◆ 美 | 批发规模，AI 大单时代经营杠杆 |
+| 底仓-设备 | 8% | Vertiv | VRT | ◆ 美 | 端到端电力+冷却，订单翻倍物理墙护城 |
+| 底仓-超大规模 | 8% | Alphabet | GOOGL | ◆ 美 | TPU 自研最强 + 估值合理，需求源 + 对冲中游 |
+| 底仓-超大规模 | 6% | Amazon | AMZN | ◆ 美 | AWS 龙头 PS 仅 3.6x |
+| 核心-矿工转型 | 9% | IREN | IREN | ◆ 美（澳籍）| Microsoft 直签 + 零 BTC + 85% EBITDA |
+| 核心-矿工转型 | 7% | Cipher | CIFR | ◆ 美 | AWS+Google backstop + EV/现金合理 |
+| 核心-矿工转型 | 6% | TeraWulf | WULF | ◆ 美 | Google backstop + EV/现金仅 5.8x 弹性最大 |
+| 核心-矿工转型 | 5% | Applied Digital | APLD | ◆ 美 | CoreWeave 110 亿租约 + EV/现金仅 7.3x |
+| 卫星-矿工转型 | 4% | Core Scientific | CORZ | ◆ 美 | 拒收购独立 + CoreWeave 12 年租约 |
+| 卫星-矿工转型 | 4% | Galaxy | GLXY | ◆ 美 | Helios 1.6GW 已批 + CoreWeave 锚定 |
+| 卫星-电力期权 | 3% | MARA | MARA | ◆ 美 | 自建燃气电厂 + PJM 园区，便宜的电力期权 |
+| 现金 | 现金 | — | — | — | 留待 neocloud 债务墙出清机会 |
+| 对冲-做空 | -3% | 高 PS 弱 backstop neocloud | — | ◆ 美 | 久期错配 + 循环融资尾部风险 |
+
+合计约 90% 多头 + 10% 现金 + 3% 对冲。全产业标的国别高度集中于美国（◆，从需求到资本全链主导），少数非美命门为 ● 荷兰 Nebius（neocloud）、● 日本味之素（ABF 载板）、● 瑞士 Staubli（液冷快接头），无 ▲ 中国标的（受出口管制走平行体系、不在美股范围）。非中国占比约 100%，地缘风险主要来自美国本土电力与政策而非跨国供应链。组合刻意把多头集中在"确定性卖水人"（42%）和"契约质量最高的矿工转型"（31%），把弹性留给电力期权（MARA），把风险通过现金和对冲管理。
+
+## 8.1 定量估值速查表
+
+下表把组合内及全产业核心标的的估值锚定到可比指标。现金、EV、收入、PS 全部真调 yfinance（载止 2026-06-08），评级用卖方惯例。
+
+| Ticker | 真调价/市值 | 市值($B) | EV($B) | 现金($B) | EV/现金 | 收入($B) | P·S | 评级 | 目标价区间 |
+|---|---|---|---|---|---|---|---|---|---|
+| ◆ EQIX | $106B | 105.7 | 127.7 | 1.4 | 93.7x | 9.5 | 11.1x | 增持 | Base 持有，确定性溢价 |
+| ◆ DLR | $66B | 66.2 | 83.2 | 2.5 | 33.7x | 6.3 | 10.5x | 增持 | Base 持有 |
+| ◆ AMT | $88B | 88.5 | 132.0 | 1.6 | 82.1x | 10.8 | 8.2x | 中性 | DC 暴露较弱 |
+| ◆ IRM | $38B | 37.5 | 57.0 | 0.2 | 227x | 7.2 | 5.2x | 中性 | PE 137x 盈利质量弱 |
+| ◆ VRT | 大盘 | — | — | — | →需补 | — | — | 增持 | 回调入场 |
+| ◆ GOOGL | $4.42T | 4416.8 | 4385.8 | 126.8 | 34.6x | 422.5 | 10.5x | 买入 | TPU+估值合理 |
+| ◆ AMZN | $2.66T | 2657.8 | 2750.2 | 143.1 | 19.2x | 742.8 | 3.6x | 买入 | PS 仅 3.6x |
+| ◆ ORCL | $616B | 616.0 | 739.0 | 39.1 | 18.9x | 64.1 | 9.6x | 中性 | OpenAI 占 54% RPO 单点 |
+| ◆ CRWV | $56B | 55.6 | 88.5 | 2.3 | 39.1x | 6.2 | 8.9x | 中性 | 龙头但债务 $35B |
+| ● NBIS | $59B | 58.9 | 59.1 | 9.4 | 6.3x | 0.9 | 67.1x | 中性 | PS 极高/现金厚 |
+| ◆ IREN | $21B | 20.7 | 22.4 | 2.2 | 10.1x | 0.8 | 27.3x | 买入 | Microsoft 直签 |
+| ◆ CIFR | $10B | 9.8 | 13.8 | 0.7 | 19.4x | 0.2 | 46.8x | 买入 | AWS+Google |
+| ◆ WULF | $13B | 12.6 | 15.3 | 2.6 | 5.8x | 0.2 | 75.1x | 买入 | Google backstop/弹性最大 |
+| ◆ APLD | $12B | 11.6 | 12.7 | 1.7 | 7.3x | 0.3 | 36.3x | 增持 | EV/现金最便宜 |
+| ◆ HUT | $13B | 13.4 | 13.7 | 0.2 | 85.4x | 0.3 | 47.2x | 中性 | Anthropic 或有条件 |
+| ◆ CORZ | $9B | 8.6 | 9.7 | 1.0 | 9.7x | 0.3 | 24.1x | 增持 | 独立+CoreWeave 租约 |
+| ◆ GLXY | $12B | 11.5 | 14.6 | 1.5 | 9.5x | 58.7 | 0.2x | 增持 | PS 失真(含交易流水) |
+| ◆ MARA | $5B | 5.0 | 7.0 | 0.5 | 13.6x | 0.9 | 5.8x | 增持 | 便宜电力期权 |
+| ◆ RIOT | $9.5B | 9.5 | 10.2 | 0.2 | 49.6x | 0.7 | 14.6x | 中性 | AMD 25MW 起步 |
+| ◆ CLSK | $4.2B | 4.2 | 5.7 | 0.3 | 22.1x | 0.7 | 5.7x | 中性 | 仅有土地 |
+| ◆ BTDR | $4.4B | 4.4 | 6.2 | 0.3 | 23.3x | 0.7 | 6.0x | 中性 | 转型分散 |
+
+这张表把"估值错配"从形容词变成了数字，揭示三个关键事实。第一，矿工转型标的的 PS 分化巨大（WULF 75x vs MARA 5.8x），但 EV/现金往往不高（WULF 5.8x、APLD 7.3x、IREN 10.1x），说明高 PS 主要源于当前收入基数低而非企业价值虚高，这正是"收入即将转固"的重定价前夜，APLD 和 WULF 的 EV/现金便宜是被低估的信号。第二，REIT 卖水人估值不便宜（EQIX PE 74x）但确定性溢价合理，是用合理价格买确定性。第三，neocloud 中 NBIS 现金极厚（EV/现金仅 6.3x）相对安全，CRWV 债务沉重（EV/现金 39x）风险更高。需特别说明，GLXY 的 PS 0.2x 是失真值，因其"收入"含加密交易流水，不应按此判断便宜。
+
+**重仓 1 深度论述（EQIX）**。Equinix 是组合的压舱石，逻辑是"用合理价格买产业链最确定的利润池"。它的护城河不是兆瓦，而是互联密度，租户一旦在 EQIX 部署、连接到云和彼此，切换成本极高，这是它能维持 51% EBITDA（批发同行约 40%）的根本。在一个电力受限、空置率低于 5% 的市场，EQIX 的定价权只会增强。它不承担 GPU 折旧风险、不依赖单一客户、不背 neocloud 式重债，AFFO 指引 9% 至 11% 增长。估值 PE 74x 看似高，但对一个确定性如此之高、且坐拥 AI 推理需求拐点的资产，这个溢价合理。风险是利率和高估值，因此适合在回调时加仓而非追高。它是组合中"睡得着觉"的那部分。
+
+**重仓 2 深度论述（IREN）**。IREN 是组合中"期权重定价"的最高确信表达。它与 Microsoft 直签 97 亿美元合约（最高信用等级的客户）、刻意零持有比特币（不被 BTC 波动拖累）、项目级 EBITDA 利润率 85%、EV/现金仅 10.1x。这三点把它与其他矿工转型标的拉开：客户是 Microsoft 而非弱信用 neocloud，资产负债表干净，盈利能力已验证。当它的 AI 收入在 2026 至 2027 年转固，市场会把它从"27x PS 的故事股"重定价为"享 REIT 倍数的 AI 基础设施"。它背负 37 亿美元可转债是主要风险，但 Microsoft 直签的现金流确定性大幅降低了偿债风险。这是本研究 thesis 2 的最佳载体。
+
+**对冲 / 做空标的论述**。对冲仓做空的是久期错配最严重、backstop 最弱、估值最依赖完美执行的标的：高 PS（>40x）+ 弱 backstop（纯母公司担保或高或有条件）+ 高杠杆 + 客户集中的 neocloud 与纯故事矿工。这类标的在 2026 至 2027 GPU 债务墙前最脆弱，一旦再融资受阻或 GPU 抵押品价值崩塌，高 PS 估值会率先崩塌。做空它们既能对冲组合的 beta，又能在 neocloud 出清时获利。注意做空要精选个股而非一篮子，因为优质 neocloud（CRWV、NBIS）有真实护城河，错杀的是弱者。Oracle 因 OpenAI 占 54% RPO 的单点风险，也是潜在的尾部对冲标的。
+
+**Watchlist 持续关注**。下面这些标的目前不在主仓位但持续监控：
+
+| Ticker | 名 | 国 | 关注理由 | 转重仓触发 |
+|---|---|---|---|---|
+| ◆ HUT | Hut 8 | 美 | 8.6GW 管线 + Anthropic 大单 | 或有条件落地 |
+| ● NBIS | Nebius | 荷 | 现金厚 + Meta 270 亿 | PS 回落至合理 |
+| ◆ GLXY | Galaxy | 美 | 1.6GW 已批 | 数据中心收入占比上升 |
+| 味之素 | ABF 载板 | 日 | 95% 垄断紫苏叶 | 直接暴露需海外账户 |
+| Staubli | 液冷快接头 | 瑞士 | 紫苏叶 | 上市或被并购 |
+
+---
+
+# 九、风险、证伪与月度跟踪
+
+*这一节告诉读者"什么时候应该放弃这个 thesis"。*
+
+任何投资 thesis 都需要清晰的 kill condition。本研究三大 thesis 的 kill condition 如下：
+
+| Thesis | Kill 触发 | 概率（3yr）| 应对动作 |
+|---|---|---|---|
+| 论断 1 电力命门 | 并网/变压器交期大幅缩短，电力不再稀缺 | 低 | 降低矿工转型仓位 |
+| 论断 2 矿工重定价 | AI 合同大面积违约/取消，矿工回归挖矿 | 中 | 退出弱 backstop 标的 |
+| 论断 3 neocloud 脆弱 | backstop 经受住债务墙，无违约 | 中 | 平掉对冲空头 |
+| 论断 4 利润在卖水人 | REIT 因利率/自建被颠覆 | 低 | 降低 REIT 仓位 |
+
+这些 kill condition 中，最需要警惕的是论断 2 的反转。矿工转型的整个 thesis 建立在"AI 合同兑现"之上，如果 Google/Microsoft 大幅放缓算力需求，或多份 Fluidstack 类租约出现违约，最高杠杆的标的会迅速崩塌。这也是为什么本研究强调契约质量甄别：Microsoft 直签（IREN）和 Google backstop（WULF/CIFR）的标的，在需求放缓时的抗风险能力远高于纯母公司担保（APLD）或高或有条件（HUT）的标的。投资者应把"AI 合同兑现进度"作为首要月度跟踪指标。
+
+**全链 worst case**。最坏情景是"AI 资本开支断崖 + GPU 债务墙 + 电力政治反弹"三重叠加。如果超大规模厂商因 AI 回报不及预期而大幅削减资本开支（论断 3 中提到的自由现金流压力是先兆），下游所有标的的需求都会枯竭；同时 GPU 抵押债到期无法再融资，触发抛售旧 GPU 的连锁反应（CoreWeave $35B、IREN $37 亿可转债、WULF $57 亿债务都在风险中）；再叠加电价政治反弹导致的限电或加税。这个 worst case 下，neocloud 和高杠杆矿工首当其冲，REIT 和超大规模厂商相对抗跌。组合通过"确定性卖水人为底仓 + 现金 + 对冲"的结构，正是为应对这一尾部。但需强调，这是低概率尾部，基准情景仍是需求真实、供给受限、分化加剧。
+
+**月度跟踪 KPI**。下面是必须每月监控的 Top 10 KPI，按 link 分组：电力（并网队列 GW 数、变压器交期）、矿工转型（各标的已签约 GW + AI 收入转固进度 + BTC 持仓占比）、neocloud（GPU 折旧政策、再融资进展、客户集中度）、REIT（空置率、续约提价、AFFO 增速）、超大规模（资本开支自由现金流平衡、自研芯片渗透率）。
+
+**Catalyst 日历**。未来 12-24 月最关键的事件：
+
+| 时间 | Catalyst | 影响 link | 推测影响 |
+|---|---|---|---|
+| 2026 H2 | 矿工 AI 收入大规模转固 | 矿工转型 | 利好（重定价加速）|
+| 2026-27 | Stargate/超大规模 GW 园区通电 | 全链 | 区分赢家输家 |
+| 2026-27 | GPU 债务墙首批再融资 | neocloud | 风险释放点 |
+| 持续 | 超大规模季度资本开支指引 | 全链 | 需求晴雨表 |
+| 持续 | 自研芯片放量进度 | neocloud/芯片 | 中游颠覆信号 |
+
+**警报阈值**。下列指标一旦触发立即重审 thesis：超大规模 2027 资本开支指引降至个位数增长（需求见顶）；任一 neocloud 出现 backstop 违约（脆弱性兑现）；GPU 租赁价较 2026 水平再腰斩（抵押品崩塌）；BTC 大幅反弹导致矿工集体回归挖矿（转型停滞）。
+
+---
+
+# 十、邻接产业与历史类比
+
+*这一节把当前产业放进更大的研究网络。*
+
+AI 数据中心是一个枢纽产业，向上连接半导体、向下连接 AI 软件、横向连接电力与资本市场。本研究的容器内已有两个强邻接的 A/B 线产物：光模块CPO光器件与半导体材料与设备，它们恰好是数据中心产业链中"芯片层"与"互联层"的深化，构成天然的研究网络。
+
+**强邻接产业（Top 3）**：
+
+第一是光模块/CPO 光器件（强度 ⭐⭐⭐⭐⭐），这是数据中心内部 GPU 互联的命脉。随着集群规模扩大到 GW 级，GPU 之间的光互联成为带宽瓶颈，CPO（共封装光学）是物理必经之路，本研究的邻接容器已对此深挖。建议跟进研究：`/industry "光模块CPO光器件"`（已有）。
+
+第二是半导体材料与设备（强度 ⭐⭐⭐⭐⭐），这是芯片层的上游，包括 ABF 载板（味之素紫苏叶）、HBM、CoWoS 先进封装。数据中心的算力上限最终受制于芯片制造，本研究的邻接容器已覆盖。建议跟进研究：`/industry "半导体材料与设备"`（已有）。
+
+第三是 AI 电力/核电（强度 ⭐⭐⭐⭐），这是数据中心的能源命门。鉴于电力已成为真瓶颈（论断 1），核电、SMR、燃气轮机、电网构成独立的深研价值。建议跟进研究：`/industry "AI 数据中心电力"`。
+
+**历史类比**。这个产业最贴切的历史类比有两个，它们分别对应 thesis 的乐观面和悲观面。
+
+第一个类比是 1999-2000 年电信泡沫的厂商融资。朗讯和北电用厂商融资（自己借钱给客户买自己的设备）催生了一轮繁荣，最终在客户违约时崩塌。Nvidia 当下的循环融资（投资 neocloud、neocloud 买其芯片）规模相对收入是朗讯的 2.8 倍，客户集中度更高（39% 收入来自两家客户）。这个类比警示 neocloud 和循环融资的脆弱性（论断 3），但也有关键差异：当年的电信带宽需求被高估，而今天的 AI 推理需求有真实的、正在货币化的应用支撑。
+
+第二个类比是 19 世纪淘金热的"卖铲子"逻辑。在淘金热中，稳定赚钱的不是淘金者，而是卖铲子、提供住宿的人。数据中心产业里，淘金者是 neocloud（高风险搏 backlog），卖铲子的是设备商（Vertiv）和提供住宿的是 REIT（EQIX）。这个类比支撑了论断 4（利润在卖水人），也是组合把底仓压在 REIT 和设备上的历史依据。
+
+**跨产业 alpha 标的**。某些公司同时受益于本产业 + 多个邻接，未充分 price-in 多重叙事：
+
+| 标的 | 本产业叙事 | 邻接叙事 | 合并 thesis |
+|---|---|---|---|
+| 味之素 | 数据中心芯片命门 | 半导体材料 ABF | 双重紫苏叶（需海外账户）|
+| Vertiv | 数据中心卖铲子 | 电力设备 | 电力+冷却双暴露 |
+| GOOGL | 超大规模买家 | AI 软件 + TPU 自研 | 需求源+芯片+模型三重 |
+
+**本研究 gap 与下次 update trigger**：本研究未深入芯片层（Nvidia/AMD/HBM）和 AI 模型层的内部竞争，这两层在邻接容器中。下次更新触发：超大规模 2027 资本开支指引发布、首例 neocloud backstop 违约、矿工 AI 收入转固超预期、Stargate 通电进度。
+
+---
+
+# 十一、结论与下一步
+
+*这一节是闭环——给读者带着明确动作离开。*
+
+回到 §1 提出的 5 个核心判断，经过 §4 至 §10 的产业链全方位检验，本研究的整体判断如下：AI 数据中心的真瓶颈已从芯片转移到电力，这一约束重写了产业的价值分配，使"持有稀缺电力的物业方"和"供应不可替代设备的卖水人"成为确定性利润池，而收入最高的 neocloud 反而是利润最薄、杠杆最重、最脆弱的夹层。矿工转型不是估值泡沫，而是一场把"可中断挖矿负荷"重定价为"契约化 AI 基础设施"的资产属性迁移，这场迁移当前只走了一半，是本研究最大的 alpha 所在，但必须用契约质量精细甄别。
+
+## 11.1 核心判断验证情况
+
+经过 §4 至 §10 的产业链 + 国别 + 标的 + 风险全方位分析，§1 提出的 5 个论断验证情况如下：
+
+| 论断 | 验证状态 | 关键证据 | 更新看法 |
+|---|---|---|---|
+| 论断 1 电力命门 | ✅ 已确认 | 2600GW 队列 + 7 年并网 + 变压器 160 周 | 加强（约束确凿）|
+| 论断 2 矿工重定价 | ✅ 已确认 | $70B+ 合同 + IREN/CIFR/WULF 契约 | 加强（重定价进行中）|
+| 论断 3 neocloud 脆弱 | ⚠️ 部分确认 | 久期错配 + 循环融资 + ORCL 54% 客户集中 | 待债务墙验证 |
+| 论断 4 利润在卖水人 | ✅ 已确认 | EQIX 51% EBITDA vs neocloud 负净利 | 加强 |
+| 论断 5 物理墙 alpha | ✅ 已确认 | 变压器/液冷紫苏叶 + 并网容量不可外购 | 加强（但部分私有难持有）|
+
+五个论断中四个被产业链强力验证，论断 3（neocloud 脆弱）尚待 2026 至 2027 GPU 债务墙的真实考验，这正是对冲仓和现金存在的理由。最重要的研究价值在于把"矿工转型"从市场的两极认知（要么是泡沫、要么是新故事）拉回到第一性：它的本质是电力资产的契约化重定价，价值取决于契约质量而非叙事热度。这就是产业研究的意义，不是堆砌数据，而是把论断在产业链上逐层试验。论断 2 被强力验证，意味着精选的矿工转型标的（IREN/CIFR/WULF/APLD）值得在重定价完成前布局；论断 3 待验证，意味着对高 PS 弱 backstop 标的保持警惕。
+
+**Top 3 立即行动**：
+
+第一，建立"确定性卖水人"底仓。配置 EQIX、DLR、Vertiv、GOOGL、AMZN（合计约 42%），获取 AI 需求的确定性暴露而不承担 neocloud 执行风险。这是组合的压舱石，在任何情景下都相对稳健。
+
+第二，精选"期权重定价"核心仓。配置契约质量最高的 IREN（Microsoft 直签）、CIFR（AWS+Google）、WULF（Google backstop + EV/现金便宜）、APLD（EV/现金最便宜），合计约 31%，吃矿工转型的重定价。规避纯故事 + 弱 backstop 标的。
+
+第三，用现金 + 对冲管理尾部。保留现金待 neocloud 债务墙出清机会，做空高 PS 弱 backstop 标的对冲 beta。注意精选个股，不做空有真实护城河的龙头（CRWV/NBIS）。
+
+**Top 3 M3 深研入口**。后续个股深研按以下优先级排队：
+
+第一优先 IREN——Microsoft 直签 + 零 BTC + 85% EBITDA + EV/现金仅 10.1x，是矿工重定价 thesis 的最佳载体，值得用 /stockdive 或 /deepdive 做透契约结构、偿债能力、转固节奏。
+
+第二优先 CIFR——AWS 55 亿 + Fluidstack 300MW + Google backstop + 3.2GW 管线，契约质量高且 EV/现金合理，深研其 backstop 递减结构和现金跑道。
+
+第三优先 EQIX——确定性利润池的标杆，深研其互联护城河的可持续性、AI 推理需求对续约提价的拉动、利率敏感性。
+
+**给基金老板 / 投委会 30 秒电梯版**：
+
+> AI 数据中心的真瓶颈是电力不是芯片，这把"持有已通电土地"的比特币矿工重定价为 AI 基础设施（$70B+ 合同已签、2026 底 70% 收入来自 AI）。利润沉淀在收过路费的 REIT（EQIX 51% EBITDA）和卖铲子的设备商，neocloud 是收入最高、利润最薄、杠杆最重的脆弱夹层。打法：底仓买确定性卖水人（EQIX/DLR/VRT/GOOGL），核心仓精选契约质量最高的矿工转型（IREN/CIFR/WULF/APLD），用现金 + 对冲管理 GPU 债务墙尾部。
+
+---
+
+# 附录 A：跨 link 对比矩阵
+
+## A.1 定价充分度矩阵（核心）
+
+| Link | 1级估值 | 2级估值 | thesis | 错配方向 | 时间窗口 | 推荐动作 |
+|---|---|---|---|---|---|---|
+| 电力/并网 | 已重估 | 容量未定价 | 真命门 | 2级低估 | 持续 | 经矿工间接持有 |
+| 设备/冷却 | VRT 已涨 | 紫苏叶买不到 | 卖水人 | 私有难持 | 持续 | VRT 回调入 |
+| REIT | 已不便宜 | 确定性合理 | 利润池 | 无明显错配 | 持续 | 合理价买确定 |
+| 矿工转型 | 仍按矿工 | 应享 REIT | 最大 alpha | 2级严重低估 | 2026-27 | 精选契约 |
+| 矿工纯血 | 矿工低估值 | 电力期权 | 尾部 | 期权未定价 | 不确定 | 选择性配置 |
+| Neocloud | 已 price-in | 久期未定价 | 风险池 | 1级高估 | 债务墙 | 精选+对冲 |
+| Oracle | 部分定价 | 客户集中未折 | 单点风险 | 1级高估 | OpenAI 命运 | 观察 |
+| 超大规模 | 充分有效 | 自研期权 | 需求源 | 大致有效 | 持续 | 底仓 |
+
+## A.2 生命周期 vs 卡脖子矩阵
+
+<!--VIZ:lifecycle-->
+```
+                       卡脖子: 极强      强        中        弱
+生命周期: Embryonic    固态变压器SST   液冷快接头   —         —
+         Growth        电力/并网      矿工转型/设备  REIT      neocloud
+         Maturity      —             超大规模云    —         传统托管
+         Decline       —             —            纯挖矿     —
+         Renewal       并网容量重定价  矿工转型重估  —         —
+```
+
+## A.3 1级 vs 2级估值 ASCII 气泡图
+
+<!--VIZ:bubble-->
+```
+估值/关注度 ↑
+高 │  NBIS●        WULF🌿        Nvidia(邻接)
+   │      CRWV●         CIFR
+   │  ORCL◆      IREN        HUT
+中 │      EQIX◆  DLR◆    APLD🌿(便宜命门)
+   │              MARA○   CORZ
+低 │  味之素🌿(命门却买不到)  Staubli🌿
+   └──────────────────────────────────────→
+     低        中         高(不可或缺/命门)
+   右下=便宜却命门=机会(APLD/味之素) · 左上=贵却可替代=风险(高PS弱backstop)
+```
+
+## A.4 ESG / 客户 / 脆弱度 Heatmap
+
+| Link | 能耗 ESG | 客户集中度 | 久期/财务脆弱度 | 政策风险 | 综合 |
+|---|---|---|---|---|---|
+| 电力/并网 | 高 | 低 | 低 | 高 | 中高 |
+| 设备 | 中 | 中 | 低 | 中 | 中 |
+| REIT | 中 | 中 | 低 | 中 | 中 |
+| 矿工转型 | 高 | 高 | 中高 | 中 | 中高 |
+| Neocloud | 高 | 极高 | 极高 | 中 | 高 |
+| Oracle | 中 | 极高 | 高 | 中 | 高 |
+
+## A.5 投资优先级总排序
+
+| Rank | Link | 总分 | 核心理由 | 推荐动作 | 表达标的 |
+|---|---|---|---|---|---|
+| 1 | REIT 卖水人 | 9.0 | 确定性利润池 | 底仓 | EQIX/DLR |
+| 2 | 矿工转型(精选) | 8.5 | 最大 alpha | 核心仓 | IREN/CIFR/WULF/APLD |
+| 3 | 设备卖铲子 | 8.3 | 物理墙护城 | 底仓 | VRT |
+| 4 | 超大规模 | 7.8 | 需求源+对冲 | 底仓 | GOOGL/AMZN |
+| 5 | 电力期权矿工 | 6.5 | 便宜期权 | 卫星 | MARA |
+| 6 | Neocloud | 5.5 | 风险池 | 精选+对冲 | CRWV/NBIS |
+| 7 | Oracle | 5.0 | 单点风险 | 观察 | ORCL |
+
+---
+
+# 附录 B：完整 KPI 速查表
+
+按 link 分组的月度跟踪 KPI：
+
+- **电力/并网**：并网队列 GW 数、变压器交期周数、各标的已通电 GW、ERCOT/PJM 大负荷队列变化
+- **设备**：Vertiv book-to-bill、backlog 覆盖月数、液冷渗透率
+- **REIT**：北弗吉尼亚空置率、续约提价幅度、AFFO 增速、预租比例
+- **矿工转型**：已签约 GW、AI 收入转固进度、契约 backstop 质量、BTC 持仓占净值比、现金跑道月数
+- **Neocloud**：GPU 折旧政策、再融资进展、客户集中度、调整后净亏损、债务/EBITDA
+- **Oracle**：OpenAI 资金链、Stargate 通电进度、RPO 兑现率、自由现金流
+- **超大规模**：季度资本开支指引、资本开支/FCF 平衡、自研芯片渗透率、云收入增速
+
+---
+
+# 附录 C：信息源与方法论
+
+## C.1 数据源
+
+**行业研究**：CoinShares 矿工 AI 合同统计、JLL 数据中心空置率、PJM/ERCOT 并网队列、各公司 8-K/6-K/10-Q（SEC EDGAR）、DCD/Data Center Frontier/Data Center Knowledge
+**财务数据**：yfinance 真调（载止 2026-06-08，20 标的 EV/现金/收入/PS）+ 各公司财报
+**新闻**：CNBC、Bloomberg、Reuters、Tom's Hardware、Axios、CoinDesk
+**政策**：FERC、PJM 市场监测、ERCOT 规划
+
+## C.2 方法论
+
+本研究使用「行业研究方法论 V2.11（单文件研报版）」生成。完整方法论见 `~/.claude/skills/industry-research/SKILL.md`。
+
+## C.3 配套数据
+
+机器可读结构化数据：`ai-datacenter_data.json` — 含全部标的、估值、KPI、charts 等结构化字段。
+
+## C.4 下次更新
+
+- 季度自动（每 3 月）
+- 事件触发：超大规模 2027 资本开支指引、首例 neocloud backstop 违约、矿工 AI 收入转固超预期、Stargate 通电
+
+---
+
+# 附录 D：紫苏叶清单（金枪鱼 vs 紫苏叶）
+
+> 方法论来源：Serenity「紫苏叶理论」——最昂贵 ≠ 最不可或缺。紫苏叶 = 市值微小/流动性稀薄/绝对技术垄断的隐形瓶颈。识别遵循 chokepoint 分类优先级：设计/工艺 know-how > 专用件 > 通用件 > 大宗材料设备（越不可采购越是真垄断）。
+
+数据中心赛道的紫苏叶有一个独特之处：全链最硬的 chokepoint 不是某个零件，而是"已并网的电力容量"这一不可采购的资产本身。这是本研究最反常识的发现，它解释了为什么一批做比特币挖矿的公司会被超大规模厂商争抢。
+
+| 链节 | 金枪鱼（最贵/明星）| 🌿 紫苏叶（隐形瓶颈）| chokepoint 论证（物理/材料墙）| 红队：若被替代靠什么 | chokepoint 类型/等级 |
+|---|---|---|---|---|---|
+| 电力/并网 | CEG/GEV（AI 电力股）| 已并网电力容量（无 ticker，体现为矿工护城河）| 并网 7 年 + 变压器 160 周，新增容量物理受限 | 自建表后电源（但仍需 7 年），无快速替代 | 不可采购资产/⭐⭐⭐⭐⭐ |
+| 设备/冷却 | Vertiv（卖铲子）| 液冷快接头 Staubli（瑞士私有）| 高密度液冷的物理接口，少数厂商垄断 | 用通用接头但漏液/压损风险，工艺 know-how | 专用件+工艺/⭐⭐⭐⭐ |
+| 设备/电力 | Eaton/西门子能源 | 固态变压器 SST（Heron/DG Matrix 私有）| 若量产可缩短交期，digital 控制 | 传统变压器（但 160 周交期），技术期权 | 设计 know-how/⭐⭐⭐⭐ |
+| 芯片(邻接) | Nvidia GPU | ABF 载板 味之素（日，95% 垄断）| 做味精的公司垄断 AI 芯片分子级载板 | 无替代，配方+工艺数十年积累 | 材料配方/⭐⭐⭐⭐⭐ |
+| 芯片(邻接) | 台积电代工 | CoWoS 先进封装产能 | 先进封装是 GPU 良率瓶颈 | 三星/Intel 封装追赶中 | 工艺产能/⭐⭐⭐⭐ |
+| 存储(邻接) | SK海力士 | HBM 高带宽存储 | AI 芯片必需，三家寡占 | 三星/美光，但产能紧 | 专用件/⭐⭐⭐⭐ |
+| 矿工转型 | IREN/WULF（明星）| 各标的"已通电+已签约"GW 数 | 同市值下 GW 数 + 契约质量定护城河 | 无法快速复制（需 7 年并网）| 不可采购资产/⭐⭐⭐⭐⭐ |
+
+**紫苏叶清单一句话结论**：数据中心赛道最硬的紫苏叶是"已并网的电力容量"本身（不可采购、无独立 ticker、体现为矿工转型标的的护城河），其次是日欧的设备/材料命门（味之素 ABF、Staubli 快接头）。前者可经矿工转型标的间接持有（这是论断 2 的底层逻辑），后者多为私有/海外、散户难直接触及，列入 watchlist 跟踪上市或并购。设计/工艺类（味之素配方、Staubli 工艺）含金量高于可采购的变压器钢材与通用机房设备。
+
+---
+
+*生成时间：2026-06-08*
+*方法论版本：行业研究方法论 V2.11（单文件研报版）*
+*配套数据：`ai-datacenter_data.json`*
+*下次更新：超大规模 2027 资本开支指引 / 首例 neocloud backstop 违约 / 矿工 AI 收入转固超预期*
+</script>
+<script id="charts" type="application/json">{"masthead": {"kicker": "BCA 产业研究 · AI Data Center · 2026-Q2", "standfirst": "真瓶颈是电力不是芯片，矿工正被重定价为 AI 基础设施", "meta": ["<span><b>口径<\/b> 美股 / 3 年视角 / yfinance 真调载止 2026-06-08<\/span>", "<span><b>覆盖<\/b> 20 标的 · REIT+NEOCLOUD+矿工转型<\/span>", "<span><b>结论<\/b> 利润沉淀在卖水人，neocloud 是脆弱夹层<\/span>"]}, "dashboard": {"tam": {"cap": "市场规模自下而上三角验证", "subcap": "物业租金层 $133B 是矿工/REIT 标的可锚定的真 TAM", "source": "本研究自建 + 五大云资本开支指引", "asof": "2026-Q2", "unit": "B", "categories": ["物业租金层(自建主锚)", "二手AI数据中心市场", "超大规模资本开支(需求上限)"], "values": [133, 300, 690], "colors": ["#8c2f23", "#b9974f", "#c9bfae"]}, "scatter": {"cap": "市值 × AI 收入可见度", "subcap": "高 PS 集中在 backlog 纯血，便宜在收入转固前夜", "source": "yfinance 真调", "asof": "2026-06-08", "expLabels": ["", "仍挖矿", "转型中", "契约高", "纯AI"], "points": [{"name": "EQIX", "mcap": 106, "exposure": 3, "buy": 1}, {"name": "IREN", "mcap": 21, "exposure": 4, "buy": 1}, {"name": "WULF", "mcap": 13, "exposure": 4, "buy": 1}, {"name": "CIFR", "mcap": 10, "exposure": 4, "buy": 1}, {"name": "APLD", "mcap": 12, "exposure": 4, "buy": 1}, {"name": "CRWV", "mcap": 56, "exposure": 4, "buy": 0}, {"name": "MARA", "mcap": 5, "exposure": 2, "buy": 1}, {"name": "CLSK", "mcap": 4, "exposure": 1, "buy": 0}]}, "portfolio": {"cap": "推荐组合配置", "subcap": "底仓卖水人 42% + 核心矿工转型 31% + 现金对冲", "items": [["EQIX", 12], ["DLR", 8], ["VRT", 8], ["GOOGL", 8], ["AMZN", 6], ["IREN", 9], ["CIFR", 7], ["WULF", 6], ["APLD", 5], ["CORZ", 4], ["GLXY", 4], ["MARA", 3], ["现金/对冲", 10]]}}, "chain": {"lead": "卡脖子不在中游制造而在两端：上游电力物理稀缺 + 横向资本栈融资稀缺", "subcap": "美国从需求到资本全链主导，日欧握关键设备/材料紫苏叶", "source": "SEC filings + 行业研究", "asof": "2026-Q2", "layers": [{"n": 0, "name": "电力与并网（真命门）", "ch": 5, "def": "2600GW队列·7年并网·变压器160周", "p": [["燃气轮机 GE Vernova", "us", 0, 0, "GEV"], ["核电 Constellation", "us", 0, 0, "CEG"], ["电力 Vistra", "us", 0, 0, "VST"], ["电网 NextEra", "us", 0, 0, "NEE"], ["行为电源 Bloom Energy", "us", 0, 0, "BE"], ["已并网电力容量(不可外购)", "us", 0, 1, ""], ["西门子能源", "eu", 0, 0, "SIEGY"], ["ERCOT/PJM 并网队列", "gate", 0, 1, ""]], "note": "全链最硬约束 = 电力稀缺"}, {"n": 1, "name": "电力与冷却设备（卖铲子·紫苏叶层）", "ch": 4, "def": "picks-and-shovels 最稳利润池", "p": [["综合电力冷却 Vertiv", "us", 0, 0, "VRT"], ["开关柜 Eaton", "us", 0, 0, "ETN"], ["施耐德电气", "eu", 0, 0, "SBGSY"], ["变压器 日立能源", "eu", 0, 0, ""], ["液冷快接头 Staubli(瑞士)", "eu", 1, 1, ""], ["固态变压器 Heron Power", "us", 1, 1, ""], ["固态变压器 DG Matrix", "us", 1, 1, ""], ["液冷快接头 CPC", "us", 0, 0, ""]], "note": "变压器/液冷是物理墙环节"}, {"n": 2, "name": "算力芯片（最贵·寡占·邻接）", "ch": 5, "def": "供给约束让位电力约束", "p": [["GPU Nvidia", "us", 0, 0, "NVDA"], ["GPU AMD", "us", 0, 0, "AMD"], ["自研 Google TPU", "us", 0, 0, "GOOGL"], ["自研 AWS Trainium", "us", 0, 0, "AMZN"], ["HBM SK海力士", "eu", 0, 0, ""], ["HBM 美光", "us", 0, 0, "MU"], ["代工 台积电", "eu", 0, 0, "TSM"], ["ABF载板 味之素(日95%)", "eu", 0, 1, ""]], "note": "ABF载板=分子级紫苏叶"}, {"n": 3, "name": "数据中心物业（REIT+矿工转型）", "ch": 4, "def": "已通电土地=不可外购护城河", "p": [["REIT Equinix", "us", 0, 0, "EQIX"], ["REIT Digital Realty", "us", 0, 0, "DLR"], ["REIT American Tower", "us", 0, 0, "AMT"], ["REIT Iron Mountain", "us", 0, 0, "IRM"], ["AI-native Applied Digital", "us", 0, 0, "APLD"], ["矿工转型 IREN", "us", 0, 0, "IREN"], ["矿工转型 TeraWulf", "us", 0, 0, "WULF"], ["矿工转型 Cipher", "us", 0, 0, "CIFR"], ["矿工转型 Hut 8", "us", 0, 0, "HUT"], ["矿工转型 Core Scientific", "us", 0, 0, "CORZ"], ["矿工转型 Galaxy", "us", 0, 0, "GLXY"], ["矿工 MARA", "us", 0, 0, "MARA"], ["矿工 Riot", "us", 0, 0, "RIOT"], ["矿工 CleanSpark", "us", 0, 0, "CLSK"], ["矿工 Bitdeer", "us", 0, 0, "BTDR"]], "note": "本研究最大 alpha"}, {"n": 4, "name": "Neocloud / GPU 云（脆弱夹层）", "ch": 3, "def": "坐在模型与硅之间收批发价", "p": [["CoreWeave($99B backlog)", "us", 0, 0, "CRWV"], ["Nebius(荷)", "eu", 0, 0, "NBIS"], ["Oracle OCI($553B RPO)", "us", 0, 0, "ORCL"], ["Lambda", "us", 1, 0, ""], ["Crusoe", "us", 1, 0, ""]], "note": "GPU抵押债+久期错配最脆弱"}, {"n": 5, "name": "超大规模平台（买家+自建）", "ch": 4, "def": "2026 资本开支 $725B(+77%)", "p": [["AWS(Amazon)", "us", 0, 0, "AMZN"], ["Google Cloud", "us", 0, 0, "GOOGL"], ["Azure(Microsoft)", "us", 0, 0, "MSFT"], ["Meta", "us", 0, 0, "META"], ["Oracle", "us", 0, 0, "ORCL"]], "note": "自研芯片侵蚀中游"}, {"n": 6, "name": "AI 模型 / 推理需求（终端）", "ch": 3, "def": "推理>训练，客户集中", "p": [["OpenAI(Stargate $300B)", "us", 1, 0, ""], ["Anthropic(Hut8 $18B)", "us", 1, 0, ""], ["xAI", "us", 1, 0, ""], ["Meta AI", "us", 0, 0, "META"]], "note": "OpenAI占Oracle RPO 54%=单点"}, {"n": 7, "name": "资本栈 / 融资结构（横向贯穿）", "ch": 4, "def": "循环融资=同一美元算三次", "p": [["私募信贷 Blackstone", "us", 0, 0, "BX"], ["私募信贷 BlackRock", "us", 0, 0, "BLK"], ["GPU抵押ABS Lambda首发", "us", 1, 0, ""], ["Google租约backstop", "us", 0, 0, "GOOGL"], ["Nvidia厂商融资$110B", "us", 0, 0, "NVDA"]], "note": "循环融资放大脆弱"}]}, "valueflow": {"cap": "资金流总览：$690B 资本开支 → 利润沉淀 4 点位", "subcap": "收入最高的 neocloud 不是利润池，钱沉淀在卖水人", "source": "各公司财报 + 本研究", "asof": "2026-Q2", "sources": [{"name": "五大云资本开支 ~$690B/年", "detail": "AWS $200B·Google $175-185B·Microsoft $190B·Meta $115-135B·Oracle $50B"}, {"name": "模型层算力承诺", "detail": "OpenAI Stargate $300B 5年 + Anthropic 等"}], "mainflow": [{"id": "①", "name": "芯片层 GPU/ASIC", "nature": "一次性采购最大 ~$450B / Nvidia 净利率~50%", "annot": "◄ 最大支出", "grade": 5, "pool": true, "players": ["Nvidia 主导", "自研 ASIC 分流"], "key": "⭐ 属半导体邻接，自研在侵蚀", "flownote": "剩余 ~$240B 流向物业/电力/建筑"}, {"id": "②", "name": "物业/REIT 层", "nature": "租金年化 ~$133B / EQIX 51% EBITDA", "annot": "◄ 利润池 #1 确定性最高", "grade": 5, "pool": true, "players": ["EQIX 51% EBITDA", "DLR 批发", "矿工转型电力换租约"], "key": "⭐ 收过路费旱涝保收，不担 GPU 折旧", "flownote": "确定性利润池"}, {"id": "③", "name": "Neocloud 层", "nature": "收入高 / 利润为负 / 杠杆最重", "annot": "◄ 夹层 代客泊车", "grade": 2, "pool": false, "players": ["CoreWeave $99B backlog 但净亏 $589M/季", "Oracle RPO $553B 但 FCF 转负"], "key": "⭐ 估值 price-in 完美执行", "flownote": "最脆弱环节"}], "parallel": [{"id": "④", "name": "平行流1：电力冷却设备（卖铲子）", "grade": 5, "annot": "利润池 #2 最稳", "detail": "Vertiv 订单 $15B·EPS +83%·物理墙保护"}, {"id": "⑤", "name": "平行流2：资本栈（收融资费）", "grade": 4, "annot": "利润池 #3 高息担险", "detail": "Blackstone/BlackRock 收 GPU 抵押债利息，但承担尾部信用风险"}], "pools": [{"n": 1, "text": "<b>芯片层 Nvidia<\/b>（半导体邻接，不在主仓）净利率~50%", "grade": 5}, {"n": 2, "text": "<b>物业/REIT<\/b>（EQIX/DLR+持电力矿工）确定性最高", "grade": 5}, {"n": 3, "text": "<b>电力冷却设备<\/b>（Vertiv/Eaton+紫苏叶变压器）物理墙护城", "grade": 5}, {"n": 4, "text": "<b>资本栈<\/b>（私募信贷收息）高息但担风险", "grade": 4}], "takeaway": "收入最高的 neocloud 利润为负、杠杆最重；利润沉淀在收过路费的物业与卖铲子的设备商"}, "geo": {"cap": "国别分布：美国全链主导 + 日欧握关键紫苏叶", "subcap": "地缘风险主要在美国本土电力/政策，而非跨国供应链", "source": "行业研究", "asof": "2026-Q2", "countries": [{"name": "美国", "color": "#8c2f23", "players": ["超大规模 AWS/Google/Azure/Meta/Oracle", "Neocloud CoreWeave", "REIT EQIX/DLR/AMT/IRM", "矿工转型 IREN/WULF/CIFR/HUT/CORZ", "电力 CEG/VST/GEV", "设备 Vertiv/Eaton", "资本 Blackstone/BlackRock"]}, {"name": "日本", "color": "#b9974f", "players": ["ABF载板 味之素(95%垄断)", "被动元件/材料"]}, {"name": "欧洲", "color": "#5a6b7b", "players": ["Neocloud Nebius(荷)", "变压器 西门子能源", "液冷快接头 Staubli(瑞士)", "施耐德(法)", "ASML(荷)"]}, {"name": "韩国", "color": "#7a8a5a", "players": ["HBM SK海力士/三星"]}, {"name": "台湾", "color": "#9a7a4a", "players": ["代工 台积电", "CoWoS 先进封装"]}]}, "bubble": {"cap": "1级 vs 2级估值错配气泡图", "subcap": "右下=便宜却命门=机会(APLD/味之素)，左上=贵却可替代=风险", "source": "yfinance 真调 + 本研究", "asof": "2026-06-08", "xLabel": "不可或缺度 →（命门）", "yLabel": "估值/关注度 ↑", "points": [{"name": "NBIS", "x": 1.5, "y": 2.7, "type": "●", "size": 22}, {"name": "WULF🌿", "x": 2.0, "y": 2.5, "type": "🌿", "size": 20}, {"name": "CRWV", "x": 1.8, "y": 2.3, "type": "●", "size": 24}, {"name": "CIFR", "x": 2.3, "y": 2.1, "type": "◆", "size": 18}, {"name": "ORCL", "x": 1.4, "y": 2.0, "type": "◆", "size": 26}, {"name": "IREN", "x": 2.5, "y": 1.9, "type": "◆", "size": 20}, {"name": "HUT", "x": 1.6, "y": 1.9, "type": "○", "size": 18}, {"name": "EQIX", "x": 2.2, "y": 1.5, "type": "◆", "size": 24}, {"name": "DLR", "x": 2.0, "y": 1.4, "type": "◆", "size": 20}, {"name": "APLD🌿", "x": 2.4, "y": 1.2, "type": "🌿", "size": 18}, {"name": "MARA", "x": 1.8, "y": 1.0, "type": "○", "size": 14}, {"name": "CORZ", "x": 2.1, "y": 1.1, "type": "○", "size": 14}, {"name": "味之素🌿", "x": 2.9, "y": 0.9, "type": "🌿", "size": 22}, {"name": "Staubli🌿", "x": 2.8, "y": 0.7, "type": "🌿", "size": 16}]}, "lifecycle": {"cap": "生命周期 × 卡脖子矩阵", "subcap": "成长期 × 命门 = 最佳象限：电力/并网 + 矿工转型", "source": "本研究", "asof": "2026-Q2", "cols": ["极强（命门）", "强", "中", "弱"], "rows": [{"stage": "Embryonic 胚胎", "cells": [["固态变压器SST"], ["液冷快接头"], [], []]}, {"stage": "Growth 成长", "cells": [["电力/并网"], ["矿工转型", "设备"], ["REIT"], ["neocloud"]]}, {"stage": "Maturity 成熟", "cells": [[], ["超大规模云"], [], ["传统托管"]]}, {"stage": "Decline 衰退", "cells": [[], [], ["纯挖矿"], []]}, {"stage": "Renewal 重生", "cells": [["并网容量重定价"], ["矿工转型重估"], [], []]}]}, "cycle": {"cap": "AI 数据中心 · 双轴定位（生命周期 × 周期相位）", "subcap": "secular 成长期 × cyclical 接近资本开支见顶 = 错位状态", "source": "五大云资本开支 + ERCOT/PJM 数据", "asof": "2026-Q2", "secular": {"stage": "成长期早中段", "pos": 0.38, "note": "AI 负荷渗透率快速爬升，推理需求才刚分化，远未饱和"}, "cyclical": {"dominant": "产能+资本周期", "phase": "接近见顶", "pos": 0.62, "note": "资本开支 +77% 增速接近极值，FCF 承压(亚马逊转负)，但需求侧仍扩张"}, "signals": {"danger": ["超大规模资本开支增速掉头(2027 指引降至个位数)", "GPU 租赁价跌破现金成本(H100 已 $8→$2/hr)", "neocloud 首例 backstop 违约/再融资失败"], "safe": ["并网队列持续堆积(2600GW)+通电交付滞后(7年)", "REIT 空置率低位(北弗吉尼亚<5%)+续约提价"], "watch": ["自建芯片渗透率(TPU/Trainium/Maia)", "Stargate/OpenAI 资金链与算力消化(占 Oracle RPO 54%)"]}, "benchmark": "vs 1999-2000 电信泡沫：Nvidia 循环融资占收入 67% > 朗讯 24%，相对规模是其 2.8 倍 → 局部脆弱(高杠杆 neocloud)+整体真实(超大规模需求)", "basis": "trend 显示资本开支增速接近极值 + benchbar 显示循环融资超历史泡沫水平，但需求侧并网申请仍加速", "synthesis": "资本见顶(capex +77% 接近极值)+需求扩张(ERCOT 数据中心需求一周期内 29→77GW)的错位 → 判 cycle = 成长期 × 接近资本见顶，单看任一轴都会误判"}, "trend": {"cap": "AI 数据中心 · 强度指标时序（周期证据层）", "subcap": "资本开支增速接近极值，但需求侧仍在扩张", "source": "五大云财报 + ERCOT", "asof": "2026-Q2", "indicators": [{"name": "超大规模资本开支(同比%)", "points": [40, 50, 62, 77], "latest": 77, "unit": "%", "dir": "↑", "xrange": "2023–2026", "refline": 100, "reflabel": "翻倍线", "note": "增速接近历史极值"}, {"name": "美国数据中心容量(GW)", "points": [18, 24, 50, 100], "latest": 100, "unit": "GW", "dir": "↑", "xrange": "2024–2030E", "refline": 100, "reflabel": "2030目标", "note": "四年4倍"}, {"name": "H100 租赁价($/hr)", "points": [8, 5, 3, 2], "latest": 2, "unit": "$/hr", "dir": "↓", "xrange": "2023–2026", "refline": 2, "reflabel": "现金成本线", "note": "下一代或再压"}, {"name": "矿工 AI 收入占比(%)", "points": [5, 15, 30, 70], "latest": 70, "unit": "%", "dir": "↑", "xrange": "2024–2026E", "refline": 70, "reflabel": "2026底目标", "note": "重定价进行中"}]}, "benchbar": {"cap": "AI 数据中心 当前 vs 历史泡沫对标", "subcap": "循环融资规模已超电信泡沫，但需求真实性更强", "source": "本研究 vs 1999-2000 电信", "asof": "2026-Q2", "analog": "1999-2000 电信泡沫（朗讯/北电厂商融资）", "items": [{"name": "厂商融资占收入(%)", "current": 67, "analog": 24, "danger": 50, "unit": "%", "dir": "up", "safe": false, "note": "Nvidia 67% vs 朗讯 24%，超阈值"}, {"name": "Top2 客户收入集中度(%)", "current": 39, "analog": 20, "danger": 35, "unit": "%", "dir": "up", "safe": false, "note": "高于电信泡沫"}, {"name": "GPU 资产寿命/债务久期(年)", "current": 3.5, "analog": 15, "danger": 5, "unit": "年", "dir": "down", "safe": false, "note": "3-4 年资产对 15-20 年债务"}, {"name": "REIT 空置率(%)", "current": 5, "analog": 20, "danger": 15, "unit": "%", "dir": "down", "safe": true, "note": "供给紧张支撑定价权"}]}, "tickers": {"ORCL": "https://finance.yahoo.com/quote/ORCL", "CRWV": "https://finance.yahoo.com/quote/CRWV", "NBIS": "https://finance.yahoo.com/quote/NBIS", "AMZN": "https://finance.yahoo.com/quote/AMZN", "GOOGL": "https://finance.yahoo.com/quote/GOOGL", "EQIX": "https://finance.yahoo.com/quote/EQIX", "DLR": "https://finance.yahoo.com/quote/DLR", "IRM": "https://finance.yahoo.com/quote/IRM", "AMT": "https://finance.yahoo.com/quote/AMT", "APLD": "https://finance.yahoo.com/quote/APLD", "IREN": "https://finance.yahoo.com/quote/IREN", "WULF": "https://finance.yahoo.com/quote/WULF", "CIFR": "https://finance.yahoo.com/quote/CIFR", "HUT": "https://finance.yahoo.com/quote/HUT", "CORZ": "https://finance.yahoo.com/quote/CORZ", "BTDR": "https://finance.yahoo.com/quote/BTDR", "GLXY": "https://finance.yahoo.com/quote/GLXY", "MARA": "https://finance.yahoo.com/quote/MARA", "RIOT": "https://finance.yahoo.com/quote/RIOT", "CLSK": "https://finance.yahoo.com/quote/CLSK", "VRT": "https://finance.yahoo.com/quote/VRT", "ETN": "https://finance.yahoo.com/quote/ETN", "NVDA": "https://finance.yahoo.com/quote/NVDA", "GEV": "https://finance.yahoo.com/quote/GEV", "CEG": "https://finance.yahoo.com/quote/CEG", "VST": "https://finance.yahoo.com/quote/VST"}}</script>
+<script>
+const OX='#8c2f23',GO='#b8860b',GB='#c9a227',CLAY='#cbbfa6',INK='#3a352d';
+const AX={axisLine:{lineStyle:{color:'#cbbfa6'}},axisLabel:{color:'#6b655c'},splitLine:{lineStyle:{color:'#ece6d8'}}};
+const NATCLS={us:'natus',eu:'nateu',cn:'natcn',res:'natres',gate:'natgate'};
+const SYM={us:'◆',eu:'●',cn:'▲',res:'◇',gate:'■'};
+const CH=JSON.parse(document.getElementById('charts').textContent||'{}');
+const TK=CH.tickers||{};
+const stars=n=>{n=Math.max(0,Math.min(5,Math.round(Number(n)||0)));return '★'.repeat(n)+'☆'.repeat(5-n);};  // clamp[0,5] 防 ch/grade 越界 → repeat(负数) 崩图（谐波电机 ch=6 实证）
+const stripFlag=s=>String(s).replace(/^[\u{1F1E6}-\u{1F1FF}\u{2600}-\u{27BF}️\s]+/u,'').trim();
+
+/* ===== 顶部 dashboard：四图竖排全宽 ===== */
+function fr(t,c,id,h){return `<div class="figrow"><h4>${t}</h4><div class="cap">${c}</div><div id="${id}" class="chart" style="height:${h}px"></div></div>`;}
+(function(){try{
+ const d=CH.dashboard||{}; let html='';
+ if(d.tam) html+=fr('市场规模 · 自下而上三角验证',d.tam.cap||'','d_tam',300);
+ if(d.scatter) html+=fr('"买不到"的可视化',d.scatter.cap||'','d_sc',330);
+ if(d.sankey) html+=fr('资金流向 · 速览',d.sankey.cap||'','d_sk',420);
+ if(d.portfolio) html+=fr('推荐组合',d.portfolio.cap||'','d_pf',400);
+ document.getElementById('dashboard').innerHTML=html;
+ if(d.tam) echarts.init(document.getElementById('d_tam')).setOption({grid:{left:138,right:34,top:6,bottom:24},tooltip:{},xAxis:{type:'value',...AX},yAxis:{type:'category',data:d.tam.categories,axisLabel:{fontSize:11,color:'#6b655c'},axisLine:{lineStyle:{color:'#cbbfa6'}}},series:[{type:'bar',barWidth:'58%',data:d.tam.values.map((v,i)=>({value:v,itemStyle:{color:d.tam.colors?d.tam.colors[i]:OX}})),label:{show:true,position:'right',formatter:`\${@[0]}${d.tam.unit||''}`,fontSize:10,color:INK}}]});
+ if(d.scatter){const E=d.scatter.expLabels||[];const pts=d.scatter.points.map(p=>({name:p.name,value:[p.mcap,p.exposure],itemStyle:{color:p.buy?OX:'#c0392b'},symbolSize:p.buy?17:24}));
+  echarts.init(document.getElementById('d_sc')).setOption({grid:{left:90,right:34,top:14,bottom:48},tooltip:{formatter:p=>`${p.data.name}<br/>市值 ~$${p.data.value[0]}B<br/>敞口：${E[p.data.value[1]]||''}`},xAxis:{type:'log',name:'市值$B(log)',nameLocation:'middle',nameGap:32,min:0.05,max:300,...AX},yAxis:{type:'value',min:0.5,max:4.5,interval:1,axisLabel:{formatter:v=>E[v]||'',color:'#6b655c'},axisLine:{lineStyle:{color:'#cbbfa6'}},splitLine:{lineStyle:{color:'#ece6d8'}}},series:[{type:'scatter',data:pts,label:{show:true,formatter:'{b}',position:'top',fontSize:11,fontWeight:'bold',color:INK}}]});}
+ if(d.sankey) echarts.init(document.getElementById('d_sk')).setOption({tooltip:{trigger:'item'},series:[{type:'sankey',left:6,right:130,top:10,bottom:10,nodeWidth:14,nodeGap:12,label:{fontSize:11,color:'#3a352d'},data:d.sankey.nodes,links:d.sankey.links,lineStyle:{color:'gradient',opacity:.4},levels:(d.sankey.levels||[]).map(l=>({depth:l.depth,itemStyle:{color:l.color}}))}]});
+ if(d.portfolio) echarts.init(document.getElementById('d_pf')).setOption({tooltip:{trigger:'item',formatter:'{b}: {c}%'},legend:{bottom:0,textStyle:{fontSize:10,color:'#6b655c'}},series:[{type:'pie',radius:['38%','64%'],center:['50%','44%'],data:d.portfolio.items.map(p=>({name:p[0],value:p[1]})),label:{formatter:'{b} {c}%',fontSize:10,color:INK},itemStyle:{borderColor:'#faf8f3',borderWidth:2},color:[OX,'#a8483a','#c07a5a',GB,'#9a7b1f','#cbbfa6','#e7dfcc']}]});
+}catch(_e){console.warn('dashboard 渲染跳过（数据/库异常，不影响正文与其它图）:',_e);}})();
+
+/* ===== 编辑风产业链图 ===== */
+function buildChain(c){
+ const rows=(c.layers||[]).map(l=>{
+  const runs=l.p.map(x=>{const[nm,nat,pv,sh,tk]=x;return `<span class="pl ${sh?'sh':''}"><span class="sup ${NATCLS[nat]}">${SYM[nat]||''}</span>${nm}${tk?` <span class="tk">${tk}</span>`:''}${pv?'<span class="pv">私</span>':''}</span>`;}).join('<span class="sep">·</span>');
+  const note=l.note?`<span class="note">▸ ${l.note}</span>`:'';
+  const cls=l.ch>=5?'bn':l.ch>=4?'hi':'';
+  return `<div class="clayer ${cls}"><div class="num">${l.n}</div><div><div class="lname">${l.name}<span class="stars">${stars(l.ch)}</span></div><div class="ldef">${l.def}</div><div class="plist">${runs}${note}</div></div></div>`;
+ }).join('');
+ const lg=`<div class="chain-legend"><span><span class="sup natus">◆</span>美国</span><span><span class="sup nateu">●</span>日韩欧</span><span><span class="sup natcn">▲</span>中国</span><span><span class="sup natres">◇</span>资源国</span><span><span class="sup natgate">■</span>支付/监管</span><span><span class="sh">紫苏叶</span> 隐形瓶颈</span><span>★ 卡脖子(满5)</span></div>`;
+ return `<figure class="vizfig">${figHead(Object.assign({},c,{cap:c.cap||c.lead}),'')}<div class="chain-fig">${rows}${lg}</div>${figFoot(c)}</figure>`;
+}
+
+/* ===== 价值传导富渲染（保全部内容，非裸桑基）===== */
+function buildValueflow(c){
+ const src=(c.sources||[]).map(s=>`<div class="s"><b>${s.name}</b> — ${s.detail}</div>`).join('');
+ const main=(c.mainflow||[]).map((l,i)=>{
+  const cls=l.pool?'pool':(i===0?'tuna':'');
+  const players=(l.players||[]).map(p=>p).join('<span class="dot">·</span>');
+  const key=l.key?`<div class="key">⭐ ${l.key}</div>`:'';
+  const note=l.flownote?`<div class="vf-flownote">▼ ${l.flownote}</div>`:'';
+  const star=l.grade?` <span style="color:#c9a227;font-size:11px">${'★'.repeat(l.grade)}</span>`:'';
+  return `<div class="vf-layer ${cls}"><div class="lh"><span class="id">${l.id||''}</span><span class="nm">${l.name}</span>${l.nature?`<span class="nat">${l.nature}</span>`:''}${star}${l.annot?`<span class="annot">◄ ${l.annot}</span>`:''}</div><div class="pl">${players}</div>${key}</div>${note}`;
+ }).join('');
+ const par=(c.parallel||[]).map(l=>{
+  const star=l.grade?` <span style="color:#c9a227;font-size:11px">${'★'.repeat(l.grade)}</span>`:'';
+  return `<div class="vf-layer"><div class="lh"><span class="id">${l.id||''}</span><span class="nm">${l.name}</span>${star}${l.annot?`<span class="annot">◄ ${l.annot}</span>`:''}</div><div class="pl">${l.detail||''}</div></div>`;
+ }).join('');
+ const pools=(c.pools||[]).map(p=>`<div class="vf-pool"><span class="pn">${p.n}</span><span class="pt">${p.text}</span>${p.grade?`<span class="pg">${'★'.repeat(p.grade)}</span>`:''}</div>`).join('');
+ const take=c.takeaway?`<div class="vf-take"><b>一句话：</b>${c.takeaway}</div>`:'';
+ return `<figure class="vizfig">${figHead(c,'')}<div class="vf">`
+  +(src?`<div class="vf-h">资金源头</div><div class="vf-src">${src}</div><div class="vf-conn">╲ ╲ ╲  注入  ▼</div>`:'')
+  +(main?`<div class="vf-h">主链 · 利润沉淀</div>${main}`:'')
+  +(par?`<div class="vf-div">平行流 · 与主链并行</div>${par}`:'')
+  +(pools?`<div class="vf-div">⭐ 钱最终沉淀在哪 · 4 个利润池</div><div class="vf-pools">${pools}</div>`:'')
+  +take+`</div>${figFoot(c)}</figure>`;
+}
+
+/* ===== 卖方级图表描述：标题 + 结论式副标题 + 数据源脚注（V2.6 全图共用）===== */
+function figHead(c,defCap){c=c||{};const cap=c.cap||defCap||'';const sub=c.subcap?`<div class="vfig-sub">${c.subcap}</div>`:'';return `<figcaption>${cap}</figcaption>${sub}`;}
+function figFoot(c){c=c||{};const hint=c.readhint?`<span class="vfig-hint">读图 ${c.readhint}</span>`:'';const src=(c.source||c.asof)?`<span class="vfig-src">数据源 ${c.source||'→需补'}${c.asof?(' · 截至 '+c.asof):''}</span>`:'';return (hint||src)?`<div class="vfig-foot">${hint}${src}</div>`:'';}
+
+/* ===== 通用 ECharts 内联图 ===== */
+function chartFigure(c,defCap,id,h){return `<figure class="vizfig">${figHead(c,defCap)}<div id="${id}" class="vchart" style="height:${h}px"></div>${figFoot(c)}</figure>`;}
+function renderGeo(el,c){const id=el.id+'_v';el.outerHTML=chartFigure(c,'国别玩家分布（块面积 = 该国玩家数 / 集中度）',id,460);
+ const data=(c.countries||[]).map(co=>({name:stripFlag(co.name),itemStyle:{color:co.color},children:(co.players||[]).map(p=>({name:p,value:1}))}));
+ echarts.init(document.getElementById(id)).setOption({tooltip:{formatter:p=>p.name},series:[{type:'treemap',roam:false,nodeClick:false,breadcrumb:{show:false},width:'100%',height:'100%',
+  label:{fontSize:12,color:'#fff',overflow:'breakAll'},
+  /* 国别标题：白字 + 深色 pill 底，浅色背景下也清晰可读 */
+  upperLabel:{show:true,height:28,color:'#fff',fontWeight:'bold',fontSize:13,backgroundColor:'rgba(28,24,20,0.66)',padding:[4,9],borderRadius:2,align:'left'},
+  itemStyle:{borderColor:'#faf8f3',borderWidth:2,gapWidth:2},
+  levels:[{itemStyle:{borderWidth:0,gapWidth:5},upperLabel:{show:false}},{itemStyle:{gapWidth:1},upperLabel:{show:true}}],data:data}]});}
+function renderBubble(el,c){const id=el.id+'_v';
+ /* 图例 + 象限标签可选覆盖（industry 默认估值口径；manifesto/author 传自己的确信度口径）*/
+ const legend=(c.legend!==undefined)?c.legend:'<span style="color:#8c2f23">◆底仓</span> <span style="color:#c0392b">●不可买</span> <span style="color:#1e7e4f">○近纯微盘</span> <span style="color:#b8860b">🌿紫苏叶</span>';
+ el.outerHTML=chartFigure(Object.assign({},c,{cap:(c.cap||'估值气泡图')+(legend?' &nbsp;·&nbsp; '+legend:'')}),null,id,440);
+ const TYC={'◆':OX,'●':'#c0392b','○':'#1e7e4f','🌿':GB};
+ const pts=(c.points||[]).map(p=>({name:p.name,value:[p.x,p.y],symbolSize:p.size||22,itemStyle:{color:TYC[p.type]||CLAY,opacity:.85},label:{show:true,formatter:p.name,position:'right',fontSize:11,color:INK}}));
+ const quad=c.quads||[{value:[0.6,2.6],t:'贵 · 但不命门'},{value:[2.4,2.6],t:'又贵又命门'},{value:[0.6,0.4],t:'便宜 · 也不命门'},{value:[2.35,0.4],t:'★ 便宜却命门 = 机会'}];
+ echarts.init(document.getElementById(id)).setOption({grid:{left:64,right:158,top:24,bottom:48},
+  tooltip:{formatter:p=>p.data.name?p.data.name:''},
+  xAxis:{name:c.xLabel||'不可或缺度 →（命门）',nameLocation:'middle',nameGap:30,min:0,max:3,axisLabel:{show:false},...AX},
+  yAxis:{name:c.yLabel||'估值 / 关注度 ↑',nameLocation:'middle',nameGap:24,nameRotate:90,min:0,max:3,axisLabel:{show:false},...AX},
+  series:[
+   {type:'scatter',data:pts,markLine:{silent:true,symbol:'none',label:{show:false},lineStyle:{color:'#d8cdb4',type:'dashed'},data:[{xAxis:1.5},{yAxis:1.5}]}},
+   {type:'scatter',symbolSize:0,silent:true,data:quad.map(q=>({value:q.value,label:{show:true,formatter:q.t,color:q.t[0]==='★'?'#9a7b1f':'#bcae93',fontSize:11,fontWeight:q.t[0]==='★'?'bold':'normal'}}))}
+  ]});}
+
+/* ===== 生命周期 × 卡脖子定位矩阵（A.2）===== */
+function renderLifecycle(el,c){
+ const cols=c.cols||[];
+ const tint=['rgba(140,47,35,.13)','rgba(154,123,31,.11)','rgba(107,101,92,.07)','rgba(168,158,140,.05)'];
+ const hdr=['#8c2f23','#9a7b1f','#7a746a','#a89e8c'];
+ let h='<figure class="vizfig">'+figHead(c,'生命周期 × 卡脖子定位矩阵');
+ h+='<div class="lcm" style="grid-template-columns:118px repeat('+cols.length+',1fr)">';
+ h+='<div class="lc-corner">生命周期 ＼ 卡脖子</div>';
+ cols.forEach((cl,i)=>h+='<div class="lc-h" style="background:'+(hdr[i]||hdr[hdr.length-1])+'">'+cl+'</div>');
+ (c.rows||[]).forEach(r=>{
+  h+='<div class="lc-row">'+r.stage+'</div>';
+  (r.cells||[]).forEach((cell,i)=>{
+   const items=(cell||[]).filter(Boolean);
+   h+='<div class="lc-cell" style="background:'+(tint[i]||tint[tint.length-1])+'">'+(items.length?items.map(x=>'<span class="lc-chip">'+x+'</span>').join(''):'<span class="lc-dash">—</span>')+'</div>';
+  });
+ });
+ h+='</div>'+figFoot(c)+'</figure>';el.outerHTML=h;
+}
+
+/* ===== A线 manifesto/author 新增渲染器（timeline / scorecard / gauge / network）===== */
+function renderTimeline(el,c){const items=(c.items||[]).map(it=>`<div class="tl-it ${it.up?'up':''}"><span class="d">${it.date||''}</span>${it.tag?`<span class="tag">${it.tag}</span>`:''}<div class="t">${it.title||''}</div>${it.detail?`<div class="x">${it.detail}</div>`:''}</div>`).join('');el.outerHTML=`<figure class="vizfig">${figHead(c,'时间线')}<div class="tl">${items}</div>${figFoot(c)}</figure>`;}
+function renderScorecard(el,c){const IC={hit:['hit','✓'],miss:['miss','✗'],part:['part','~'],partial:['part','~']};const rows=(c.items||[]).map(it=>{const o=IC[it.outcome]||['part','~'];return `<div class="row"><span class="ic ${o[0]}">${o[1]}</span><span class="dt">${it.date||''}</span><span class="pr"><b>${it.pred||''}</b>${it.note?`<span class="nt">${it.note}</span>`:''}</span></div>`;}).join('');el.outerHTML=`<figure class="vizfig">${figHead(c,'历史预测命中率')}<div class="scard"><div class="hr"><span class="big">${c.hitrate||''}</span><span class="lb">${c.note||'命中率（Claude 自动评 · 含幸存者偏差/自报/择时折扣）'}</span></div>${rows}</div>${figFoot(c)}</figure>`;}
+function renderGauge(el,c){const subs=(c.subscores||[]).map(s=>{const mx=s.max||5,pct=Math.max(0,Math.min(100,Math.round((s.val/mx)*100)));return `<span class="nm">${s.name}</span><span class="bar"><i style="width:${pct}%"></i></span><span class="vv">${s.val}/${mx}</span>`;}).join('');el.outerHTML=`<figure class="vizfig">${figHead(c,'评分')}<div class="gau"><div class="top"><span class="big">${c.score}</span><span class="mx">/ ${c.max||5}</span><span class="lb">${c.label||''}</span></div>${subs?`<div class="sub">${subs}</div>`:''}</div>${figFoot(c)}</figure>`;}
+function renderNetwork(el,c){const id=el.id+'_v';el.outerHTML=chartFigure(c,'关联思想圈',id,400);const groups=[...new Set((c.nodes||[]).map(n=>n.group||'其他'))];const pal=[OX,'#1e7e4f',GB,'#3a6ea5','#6d4c9a','#a89e8c'];echarts.init(document.getElementById(id)).setOption({tooltip:{},legend:{bottom:0,textStyle:{fontSize:10,color:'#6b655c'},data:groups},series:[{type:'graph',layout:'force',roam:true,label:{show:true,fontSize:11,color:'#3a352d'},force:{repulsion:130,edgeLength:80},categories:groups.map(g=>({name:g})),data:(c.nodes||[]).map(n=>({name:n.name,category:groups.indexOf(n.group||'其他'),symbolSize:n.size||24,itemStyle:{color:pal[groups.indexOf(n.group||'其他')%pal.length]}})),links:(c.links||[]).map(l=>({source:l.source,target:l.target})),lineStyle:{color:'#cbbfa6',width:1.2,curveness:0.08}}]});}
+
+/* ===== industry 双轴定位：生命周期 S 曲线 × 周期相位（纯 SVG 编辑卡）===== */
+function renderCycle(el,c){
+ const sec=c.secular||{},cyc=c.cyclical||{},sig=c.signals||{};
+ const sp=Math.max(0,Math.min(1,sec.pos!=null?sec.pos:0.5));
+ const cp=Math.max(0,Math.min(1,cyc.pos!=null?cyc.pos:0.5));
+ const W=320;
+ /* ① 生命周期 S 曲线（logistic，左低右高）*/
+ const sy=t=>58-(1/(1+Math.exp(-11*(t-0.5))))*48;
+ let spath='';for(let i=0;i<=48;i++){const t=i/48;spath+=(i?'L':'M')+(t*W).toFixed(1)+' '+sy(t).toFixed(1)+' ';}
+ const ST=[['萌芽',0.125],['成长',0.375],['成熟',0.625],['衰退',0.875]];
+ const sticks=ST.map(s=>`<text x="${(s[1]*W).toFixed(0)}" y="65" text-anchor="middle" font-size="9" fill="#a89e8c">${s[0]}</text>`).join('');
+ /* A3 轨迹：上期→当前（空心=上期、实心=当前），示意移动方向 */
+ const traj=(prev,cur,yf,color)=>{if(prev==null||!isFinite(prev))return '';const x1=(prev*W),y1=yf(prev);return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)} L${(cur*W).toFixed(1)} ${yf(cur).toFixed(1)}" stroke="${color}" stroke-width="2" opacity=".5"/><circle cx="${x1.toFixed(1)}" cy="${y1.toFixed(1)}" r="3" fill="#faf8f3" stroke="${color}" stroke-width="1.5"/>`;};
+ const sdot=`<circle cx="${(sp*W).toFixed(1)}" cy="${sy(sp).toFixed(1)}" r="5" fill="${OX}" stroke="#faf8f3" stroke-width="2"/>`;
+ const svgS=`<svg viewBox="0 0 ${W} 70"><path d="${spath}" fill="none" stroke="#cbbfa6" stroke-width="2"/>${traj(sec.prevPos,sp,sy,OX)}${sdot}${sticks}</svg>`;
+ /* ② 周期相位正弦（t=0 触底 → 0.5 见顶 → 1 触底）*/
+ const cyv=t=>35+22*Math.cos(2*Math.PI*t);
+ let cpath='';for(let i=0;i<=64;i++){const t=i/64;cpath+=(i?'L':'M')+(t*W).toFixed(1)+' '+cyv(t).toFixed(1)+' ';}
+ const PH=[['触底',0.0],['扩张',0.25],['见顶',0.5],['收缩',0.75]];
+ const cticks=PH.map(p=>`<text x="${(p[1]*W).toFixed(0)}" y="65" text-anchor="${p[1]===0?'start':'middle'}" font-size="9" fill="#a89e8c">${p[0]}</text>`).join('');
+ const cdot=`<circle cx="${(cp*W).toFixed(1)}" cy="${cyv(cp).toFixed(1)}" r="5" fill="${GO}" stroke="#faf8f3" stroke-width="2"/>`;
+ const svgC=`<svg viewBox="0 0 ${W} 70"><path d="${cpath}" fill="none" stroke="#cbbfa6" stroke-width="2"/>${traj(cyc.prevPos,cp,cyv,GO)}${cdot}${cticks}</svg>`;
+ const col=(cls,h,arr)=>`<div class="col ${cls}"><h5>${h}</h5><ul>${((arr&&arr.length)?arr:['→需补']).map(x=>`<li>${x}</li>`).join('')}</ul></div>`;
+ const basis=c.basis?`<div class="cyc-basis"><b>判断依据：</b>${c.basis}</div>`:'';
+ const bm=c.benchmark?`<div class="cyc-bm"><b>历史对标：</b>${c.benchmark}</div>`:'';
+ const syn=c.synthesis?`<div class="cyc-syn">▶ 证据链：${c.synthesis}</div>`:'';
+ const cc=Object.assign({readhint:'横看结构（S曲线）、纵看周期（正弦）；空心点=上期、实心点=当前'},c);
+ el.outerHTML=`<figure class="vizfig">${figHead(cc,'双轴定位 · 生命周期 × 周期相位')}<div class="cyc">`
+  +`<div class="cyc-ax"><div class="cyc-lbl">① 生命周期（结构性）· 当前 <b>${sec.stage||'—'}</b>${sec.note?' · '+sec.note:''}</div>${svgS}</div>`
+  +`<div class="cyc-ax"><div class="cyc-lbl">② 周期相位（周期性）· 主导 ${cyc.dominant||'—'} · 当前 <b>${cyc.phase||'—'}</b>${cyc.note?' · '+cyc.note:''}</div>${svgC}</div>`
+  +`<div class="cyc-sig">${col('danger','⚠ 危险信号（→见顶/反转）',sig.danger)}${col('safe','✓ 安全信号（扩张可持续）',sig.safe)}${col('watch','◉ 关键观察变量',sig.watch)}</div>`
+  +basis+bm+syn+`</div>${figFoot(cc)}</figure>`;
+}
+
+/* ===== industry 周期证据层①：强度指标时序小多图（纯 SVG sparkline）===== */
+function renderTrend(el,c){
+ const inds=c.indicators||[];
+ const spark=ind=>{const a=(ind.points||[]).filter(v=>v!=null&&isFinite(v));const W=200,H=48,n=a.length;
+  if(n<2)return '<svg viewBox="0 0 '+W+' '+H+'"><text x="6" y="26" font-size="10" fill="#a89e8c">→需补</text></svg>';
+  const rf=Number(ind.refline),vals=isFinite(rf)?a.concat([rf]):a;
+  const mn=Math.min(...vals),mx=Math.max(...vals),rg=(mx-mn)||1,x=i=>(i/(n-1))*W,y=v=>H-11-((v-mn)/rg)*(H-20);
+  let p='';for(let i=0;i<n;i++)p+=(i?'L':'M')+x(i).toFixed(1)+' '+y(a[i]).toFixed(1)+' ';
+  /* A1 参考线（现金成本 / 100% / 饱和线）*/
+  let ref='';if(isFinite(rf)){const ry=y(rf).toFixed(1);ref='<line x1="0" y1="'+ry+'" x2="'+W+'" y2="'+ry+'" stroke="#c0392b" stroke-width="1" stroke-dasharray="3 3" opacity=".55"/><text x="'+W+'" y="'+(y(rf)-2).toFixed(1)+'" text-anchor="end" font-size="7.5" fill="#c0392b">'+(ind.reflabel||('参考 '+rf))+'</text>';}
+  /* A1 拐点（内部极值 = 转向点）*/
+  let ai=0,xi=0;for(let i=1;i<n-1;i++){if(a[i]<a[ai])ai=i;if(a[i]>a[xi])xi=i;}
+  let ti=-1;if(ai>0&&ai<n-1&&a[ai]<a[0]&&a[ai]<a[n-1])ti=ai;else if(xi>0&&xi<n-1&&a[xi]>a[0]&&a[xi]>a[n-1])ti=xi;
+  const turn=ti>=0?'<circle cx="'+x(ti).toFixed(1)+'" cy="'+y(a[ti]).toFixed(1)+'" r="3" fill="#faf8f3" stroke="'+GO+'" stroke-width="2"/>':'';
+  /* A1 时间轴端点标 */
+  const xr=ind.xrange?String(ind.xrange).split(/[–\-→~]/):null;
+  const xlab=xr&&xr.length>=2?'<text x="0" y="'+(H-1)+'" font-size="7.5" fill="#bcae93">'+xr[0]+'</text><text x="'+W+'" y="'+(H-1)+'" text-anchor="end" font-size="7.5" fill="#bcae93">'+xr[xr.length-1]+'</text>':'';
+  return '<svg viewBox="0 0 '+W+' '+H+'">'+ref+'<path d="'+p+'" fill="none" stroke="#cbbfa6" stroke-width="2"/>'+turn+'<circle cx="'+x(n-1).toFixed(1)+'" cy="'+y(a[n-1]).toFixed(1)+'" r="3.6" fill="'+OX+'"/>'+xlab+'</svg>';};
+ const DIR={'↑':'#1e7e4f','↓':'#c0392b','→':GO};
+ const cells=inds.map(ind=>{const dir=ind.dir||'→';return `<div class="tr-cell"><div class="tr-nm">${ind.name||''}</div>${spark(ind)}<div class="tr-foot"><span class="tr-val">${ind.latest!=null?ind.latest:'→需补'}${(ind.latest!=null&&ind.unit)?ind.unit:''}</span><span class="tr-dir" style="color:${DIR[dir]||GO}">${dir}</span></div>${ind.note?`<div class="tr-note">${ind.note}</div>`:''}</div>`;}).join('');
+ const cc=Object.assign({readhint:'每格一指标：灰线=时序 · 实心点=最新 · 空心点=拐点 · 红虚线=参考/阈值 · 底标起止年'},c);
+ el.outerHTML=`<figure class="vizfig">${figHead(cc,'强度指标时序 · 周期证据层')}<div class="tr">${cells}</div>${figFoot(cc)}</figure>`;
+}
+
+/* ===== industry 周期证据层②：当前 vs 历史泡沫阈值对标条 ===== */
+function renderBenchbar(el,c){
+ const rows=(c.items||[]).map(it=>{
+  const cur=Number(it.current),dg=Number(it.danger),anl=Number(it.analog),okCur=isFinite(cur);
+  const refs=[cur,dg,anl].filter(isFinite),max=refs.length?Math.max.apply(null,refs)*1.18:1;
+  const pct=v=>Math.max(0,Math.min(100,(v/max)*100));
+  /* A2 方向：up=越高越危险 / down=越低越危险；safe 优先显式给 */
+  const dir=it.dir||(isFinite(dg)?(dg>=cur?'up':'down'):'up');
+  let safe=it.safe;if(safe==null&&isFinite(dg))safe=(dir==='up')?(cur<dg):(cur>dg);if(safe==null)safe=true;
+  const bc=safe?'#1e7e4f':'#c0392b';
+  const curTxt=okCur?(cur+(it.unit||'')):'→需补';
+  const dirHint=dir==='down'?'↓越低越危险':'↑越高越危险';
+  const curBar=okCur?`<div class="bb-fill" style="width:${Math.max(2,pct(cur)).toFixed(1)}%;background:${bc}"></div>`:'';
+  const anMark=isFinite(anl)?`<div class="bb-anmark" style="left:${pct(anl).toFixed(1)}%"></div>`:'';
+  const thr=isFinite(dg)?`<div class="bb-thr" style="left:${pct(dg).toFixed(1)}%"></div>`:'';
+  const refTxt=[isFinite(anl)?`<span class="bb-ref">◆对标 ${anl}${it.unit||''}</span>`:'',isFinite(dg)?`<span class="bb-dg">┊阈值 ${dg}${it.unit||''}</span>`:''].filter(Boolean).join('　');
+  return `<div class="bb-row"><div class="bb-nm">${it.name||''}<span class="bb-dir">${dirHint}</span></div><div class="bb-track">${curBar}${anMark}${thr}</div><div class="bb-val"><b style="color:${bc}">${curTxt}</b>${refTxt?`<span class="bb-refline">${refTxt}</span>`:''}</div>${it.note?`<div class="bb-note">▸ ${it.note}</div>`:''}</div>`;
+ }).join('');
+ const an=c.analog?`<div class="bb-an">对标基准：<b>${c.analog}</b> · 条=当前值（绿安全/红风险）· ◆=历史对标水平 · ┊=危险阈值</div>`:'';
+ const cc=Object.assign({readhint:'每行 当前值 vs ◆历史对标 vs ┊危险阈值，看安全边际还剩多少'},c);
+ el.outerHTML=`<figure class="vizfig">${figHead(cc,'当前 vs 历史泡沫 · 关键比率对标')}<div class="bb">${an}${rows}</div>${figFoot(cc)}</figure>`;
+}
+
+/* ===== V2.7.1 通用解剖渲染原型库 =====================================
+   设计：data 驱动 + 可扩展原型 + path 逃生舱，服务任意技术类型（HBM/显卡/光模块/机器人/电池/天线…）。
+   ── BOARD_SHELL[shape](BW,BH)：原型外壳，画该原型的示意轮廓+特征（一眼认出，非工程精确）。
+   ── PART_GLYPH[shape](px,py,pw,ph,fill,p)：部件图元，画有辨识度的器件符号；fill 一律 = gcol(grade)（色深=卡脖子度）。
+   逃生舱：board.path / parts[].path 直接给自定义轮廓 d 值 → 库里没有的物体无需改代码。
+   三重缺省回退（零回归）：board.shape 缺→扁平 ab-bg 底板；parts[].shape 缺→rect 图元；parts 缺坐标→只出图例表。*/
+const _f1=v=>Number(v).toFixed(1);
+/* 原型外壳库：返回外壳 SVG（不含部件）。每个示意级即可。*/
+const BOARD_SHELL={
+ /* PCB：板轮廓 + 底边金手指齿 + 四角安装孔 + 内缩丝印边框 + 几条示意走线 */
+ pcb(W,H){const gn=Math.max(5,Math.round(W/26)),gw=W/(gn*2-1),gy=H-7,r=Math.min(7,Math.round(Math.min(W,H)/10));
+  let g='';for(let i=0;i<gn;i++){const gx=i*gw*2;g+=`<rect class="ab-metal" x="${_f1(gx)}" y="${_f1(gy)}" width="${_f1(gw)}" height="7" rx="1"/>`;}
+  const m=9,hr=3.4;let holes='';[[m,m],[W-m,m],[m,H-m-7],[W-m,H-m-7]].forEach(p=>holes+=`<circle class="ab-hole" cx="${_f1(p[0])}" cy="${_f1(p[1])}" r="${hr}"/>`);
+  let tr='';for(let i=0;i<4;i++){const ty=14+i*((H-30)/3);tr+=`<path class="ab-trace" d="M14 ${_f1(ty)} H${_f1(W*0.4)} V${_f1(ty+9)} H${_f1(W-16)}"/>`;}
+  return `<rect class="ab-shell" x="0" y="0" width="${_f1(W)}" height="${_f1(H)}" rx="${r}"/>`
+   +`<rect class="ab-edge-d" x="6" y="6" width="${_f1(W-12)}" height="${_f1(H-13)}" rx="${Math.max(2,r-3)}"/>`+tr+g+holes;},
+ /* STACK：芯片叠层侧剖面 = 一摞带厚度/分隔缝的水平层 + 左侧贯穿 TSV 竖线（部件另由 section 布局叠放）*/
+ stack(W,H){const r=4,n=5;let layers='';for(let i=0;i<n;i++){const ly=6+i*((H-12)/n),lh=(H-12)/n;
+   layers+=`<rect class="ab-shell2" x="10" y="${_f1(ly)}" width="${_f1(W-20)}" height="${_f1(lh-1.5)}" rx="1.5"/>`;}
+  const tsv=`<line class="ab-tsv" x1="20" y1="6" x2="20" y2="${_f1(H-6)}"/><line class="ab-tsv" x1="${_f1(W-20)}" y1="6" x2="${_f1(W-20)}" y2="${_f1(H-6)}"/>`;
+  return `<rect class="ab-shell" x="0" y="0" width="${_f1(W)}" height="${_f1(H)}" rx="${r}"/>${layers}${tsv}`;},
+ /* MODULE：金属外壳 + 左侧光口圆 + 法兰螺孔 */
+ module(W,H){const r=16;const cy=H/2,pr=Math.min(13,H*0.16);
+  let scr='';[[12,12],[W-12,12],[12,H-12],[W-12,H-12]].forEach(p=>scr+=`<circle class="ab-hole" cx="${_f1(p[0])}" cy="${_f1(p[1])}" r="2.6"/>`);
+  const port=`<circle class="ab-metal" cx="14" cy="${_f1(cy)}" r="${_f1(pr)}"/><circle class="ab-hole" cx="14" cy="${_f1(cy)}" r="${_f1(pr*0.5)}"/>`;
+  return `<rect class="ab-shell" x="0" y="0" width="${_f1(W)}" height="${_f1(H)}" rx="${r}"/>`
+   +`<rect class="ab-edge-d" x="7" y="7" width="${_f1(W-14)}" height="${_f1(H-14)}" rx="${r-5}"/>${scr}${port}`;},
+ /* MECH：机械件剖面 = 外壳轮廓 + 中心轴/转子示意 + 端盖缝 */
+ mech(W,H){const r=10,cx=W/2,cy=H/2,ro=Math.min(W,H)*0.34,ri=ro*0.4;
+  return `<rect class="ab-shell" x="0" y="0" width="${_f1(W)}" height="${_f1(H)}" rx="${r}"/>`
+   +`<line class="ab-edge" x1="${_f1(W*0.18)}" y1="6" x2="${_f1(W*0.18)}" y2="${_f1(H-6)}"/>`
+   +`<circle class="ab-shell2" cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(ro)}"/>`
+   +`<circle class="ab-metal" cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(ri)}"/>`
+   +`<line class="ab-edge" x1="${_f1(cx)}" y1="${_f1(cy-ro)}" x2="${_f1(cx)}" y2="${_f1(cy+ro)}"/>`;},
+ /* DIE：芯片裸晶 floorplan = 外框 + 网格分区底纹 + 内缩 seal-ring */
+ die(W,H){const r=3,step=Math.max(18,Math.round(W/8));let grid='';
+  for(let gx=step;gx<W;gx+=step)grid+=`<line class="ab-glyph-ln" x1="${_f1(gx)}" y1="4" x2="${_f1(gx)}" y2="${_f1(H-4)}"/>`;
+  for(let gy=step;gy<H;gy+=step)grid+=`<line class="ab-glyph-ln" x1="4" y1="${_f1(gy)}" x2="${_f1(W-4)}" y2="${_f1(gy)}"/>`;
+  return `<rect class="ab-shell2" x="0" y="0" width="${_f1(W)}" height="${_f1(H)}" rx="${r}"/>`
+   +`<rect class="ab-edge" x="5" y="5" width="${_f1(W-10)}" height="${_f1(H-10)}" rx="2"/>${grid}`;}
+};
+/* 部件图元库：返回部件 SVG（轮廓+内部特征），fill=gcol(grade)。rect=现状兜底。*/
+const PART_GLYPH={
+ rect(x,y,w,h,fill){return `<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="3" fill="${fill}" fill-opacity=".88"/>`;},
+ /* chip：黑体 + 四边引脚短线 + pin-1 角点 */
+ chip(x,y,w,h,fill){const np=Math.max(2,Math.min(5,Math.round(w/12))),sp=w/(np+1),L=4;let pins='';
+  for(let i=1;i<=np;i++){const px=x+sp*i;pins+=`<line class="ab-pin" x1="${_f1(px)}" y1="${_f1(y)}" x2="${_f1(px)}" y2="${_f1(y-L)}"/><line class="ab-pin" x1="${_f1(px)}" y1="${_f1(y+h)}" x2="${_f1(px)}" y2="${_f1(y+h+L)}"/>`;}
+  const nv=Math.max(2,Math.min(5,Math.round(h/12))),vp=h/(nv+1);
+  for(let i=1;i<=nv;i++){const py=y+vp*i;pins+=`<line class="ab-pin" x1="${_f1(x)}" y1="${_f1(py)}" x2="${_f1(x-L)}" y2="${_f1(py)}"/><line class="ab-pin" x1="${_f1(x+w)}" y1="${_f1(py)}" x2="${_f1(x+w+L)}" y2="${_f1(py)}"/>`;}
+  return pins+`<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="2" fill="${fill}" fill-opacity=".9"/>`
+   +`<circle class="ab-pin1" cx="${_f1(x+4)}" cy="${_f1(y+4)}" r="1.7"/>`;},
+ /* die：裸晶 + 对角划片纹 */
+ die(x,y,w,h,fill){return `<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="1.5" fill="${fill}" fill-opacity=".9"/>`
+  +`<line class="ab-glyph-ln" x1="${_f1(x)}" y1="${_f1(y)}" x2="${_f1(x+w)}" y2="${_f1(y+h)}"/><line class="ab-glyph-ln" x1="${_f1(x+w)}" y1="${_f1(y)}" x2="${_f1(x)}" y2="${_f1(y+h)}"/>`;},
+ /* connector：金手指齿 / 插针阵列 */
+ connector(x,y,w,h,fill){const n=Math.max(3,Math.round(w/7)),fw=w/(n*1.6);let f='';
+  for(let i=0;i<n;i++){const fx=x+i*(w/n)+ (w/n-fw)/2;f+=`<rect x="${_f1(fx)}" y="${_f1(y)}" width="${_f1(fw)}" height="${_f1(h)}" rx="1" fill="${fill}" fill-opacity=".92"/>`;}
+  return `<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="1" fill="none" stroke="${fill}" stroke-width="1" opacity=".5"/>${f}`;},
+ /* heatsink：竖鳍片排 */
+ heatsink(x,y,w,h,fill){const n=Math.max(3,Math.round(w/6)),fw=w/(n*1.8);let f='';
+  for(let i=0;i<n;i++){const fx=x+i*(w/n);f+=`<rect x="${_f1(fx)}" y="${_f1(y)}" width="${_f1(fw)}" height="${_f1(h)}" rx="1" fill="${fill}" fill-opacity=".82"/>`;}
+  return f+`<rect x="${_f1(x)}" y="${_f1(y+h-3)}" width="${_f1(w)}" height="3" fill="${fill}" fill-opacity=".95"/>`;},
+ /* capacitor：圆柱 + 极性条 */
+ capacitor(x,y,w,h,fill){const cx=x+w/2;return `<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="${_f1(Math.min(w,h)/2.4)}" fill="${fill}" fill-opacity=".88"/>`
+  +`<ellipse cx="${_f1(cx)}" cy="${_f1(y+3)}" rx="${_f1(w/2-1)}" ry="2.2" fill="none" class="ab-glyph-ln"/>`
+  +`<rect x="${_f1(x+1.5)}" y="${_f1(y+3)}" width="2.4" height="${_f1(h-6)}" fill="var(--paper2)" opacity=".75"/>`;},
+ /* coil：线圈 / 绕组弧线（电机/电感）*/
+ coil(x,y,w,h,fill){const cx=x+w/2,cy=y+h/2,n=Math.max(3,Math.round(w/9)),rw=w/(n+1);let arcs='';
+  for(let i=0;i<n;i++){const ax=x+rw*(i+0.7);arcs+=`<ellipse cx="${_f1(ax)}" cy="${_f1(cy)}" rx="${_f1(rw*0.55)}" ry="${_f1(h/2-1.5)}" fill="none" stroke="${fill}" stroke-width="1.6" opacity=".82"/>`;}
+  return `<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="3" fill="${fill}" fill-opacity=".14"/>${arcs}`;},
+ /* gear：齿轮（机械）*/
+ gear(x,y,w,h,fill){const cx=x+w/2,cy=y+h/2,R=Math.min(w,h)/2-1,nt=10;let teeth='';
+  for(let i=0;i<nt;i++){const a=(i/nt)*2*Math.PI,a2=a+Math.PI/nt*0.55;
+   teeth+=`<line x1="${_f1(cx+Math.cos(a)*R*0.82)}" y1="${_f1(cy+Math.sin(a)*R*0.82)}" x2="${_f1(cx+Math.cos(a2)*R)}" y2="${_f1(cy+Math.sin(a2)*R)}" stroke="${fill}" stroke-width="2.4" stroke-linecap="round"/>`;}
+  return teeth+`<circle cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R*0.78)}" fill="${fill}" fill-opacity=".88"/><circle cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R*0.3)}" fill="var(--paper2)"/>`;},
+ /* cell：电芯（电池）+ 正极柱 */
+ cell(x,y,w,h,fill){return `<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="2.5" fill="${fill}" fill-opacity=".88"/>`
+  +`<rect x="${_f1(x+w/2-3)}" y="${_f1(y-2.5)}" width="6" height="3" rx="1" fill="${fill}"/>`
+  +`<line class="ab-glyph-ln" x1="${_f1(x+3)}" y1="${_f1(y+h/2)}" x2="${_f1(x+w-3)}" y2="${_f1(y+h/2)}"/>`;},
+ /* lens：透镜 / 同心圆（光学）*/
+ lens(x,y,w,h,fill){const cx=x+w/2,cy=y+h/2,R=Math.min(w,h)/2-1;return `<circle cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R)}" fill="${fill}" fill-opacity=".5"/>`
+  +`<circle cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R*0.62)}" fill="none" stroke="${fill}" stroke-width="1.4"/><circle cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R*0.28)}" fill="${fill}" fill-opacity=".95"/>`;},
+ /* port：光口同心圆（带法兰）*/
+ port(x,y,w,h,fill){const cx=x+w/2,cy=y+h/2,R=Math.min(w,h)/2-1;return `<circle class="ab-metal" cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R)}"/>`
+  +`<circle cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R*0.55)}" fill="${fill}" fill-opacity=".9"/><circle cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R*0.22)}" fill="var(--paper2)"/>`;},
+ /* stack-layer：带厚度阴影的叠层条（叠层剖面用）*/
+ 'stack-layer'(x,y,w,h,fill){return `<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="1.5" fill="${fill}" fill-opacity=".9"/>`
+  +`<rect x="${_f1(x)}" y="${_f1(y+h-2.2)}" width="${_f1(w)}" height="2.2" fill="#000" opacity=".18"/>`
+  +`<line class="ab-glyph-ln" x1="${_f1(x)}" y1="${_f1(y+0.8)}" x2="${_f1(x+w)}" y2="${_f1(y+0.8)}"/>`;}
+};
+/* ===== techdive 实体标注解剖图：编号 callout schematic + 图例表（纯 SVG 编辑卡 + HTML 表）=====
+   部件按 grade(1-5) 用 oxblood→faint 渐变着色；ticker 以纯文本输出，复用全局 ticker→Yahoo linkify。
+   V2.7.1：升级为通用标注解剖图——BOARD_SHELL 外壳原型 + PART_GLYPH 部件图元 + path 逃生舱 + section 剖面视图 + 外置 leader-line 标注。
+   降级（零回归）：board.shape 缺→扁平 ab-bg；parts[].shape 缺→rect；parts 缺 x/y 坐标 → 只渲图例表（诚实不假装）。*/
+function renderAnatomy(c){
+ const parts=(c.parts||[]);
+ const GRADE=['#cbbfa6','#bf9a8c','#b66f5d','#a8483a','#8c2f23']; // grade 1→5: faint → oxblood
+ const tint =['rgba(203,195,182,.18)','rgba(191,154,140,.20)','rgba(182,111,93,.22)','rgba(168,72,58,.24)','rgba(140,47,35,.26)'];
+ const gcol=g=>{const i=Math.max(1,Math.min(5,Number(g)||1))-1;return GRADE[i];};
+ const gtint=g=>{const i=Math.max(1,Math.min(5,Number(g)||1))-1;return tint[i];};
+ const stripsec=s=>String(s==null?'':s);
+ /* ① 解剖板（SVG）— 仅当 parts 全有 x/y 坐标时绘制 */
+ const placed=parts.filter(p=>p&&isFinite(Number(p.x))&&isFinite(Number(p.y)));
+ const bd=c.board||{};
+ const section=bd.view==='section';
+ /* 是否启用任一新特性（外壳原型 / path 逃生舱 / 剖面视图 / 部件图元）——
+    ★ 零回归关键：只有显式请求新特性才走富渲染；不带任何新字段的老 anatomy JSON → legacy 分支 → 字节级不变。
+    外置 leader 标注不是触发条件：它在富渲染分支内默认开启（labels:false 可关回 on-part 徽标），
+    也可对老式 schematic 用 board.labels:true 单独点亮（不改其余渲染）。 */
+ const hasShell=!!(bd.shape||bd.path);
+ const hasGlyph=placed.some(p=>p.shape||p.path);
+ const wantLabel=(bd.labels===true)||((hasShell||hasGlyph||section)&&bd.labels!==false);
+ const enrich=hasShell||hasGlyph||section||(bd.labels===true&&placed.length);
+ let board='';
+ if(placed.length && !enrich){
+  /* ── legacy 分支（与 V2.7.0 字节级一致）── */
+  const BW=Math.max(160,Number(bd.w)||320),BH=Math.max(110,Number(bd.h)||210);
+  const round=(bd.shape==='module')?18:9;
+  const cells=placed.map(p=>{
+   const w=Math.max(4,Number(p.w)||14),h=Math.max(4,Number(p.h)||12);
+   const x=Math.max(0,Math.min(100,Number(p.x))),y=Math.max(0,Math.min(100,Number(p.y)));
+   const px=(x/100)*BW,py=(y/100)*BH,pw=(w/100)*BW,ph=(h/100)*BH;
+   const cx=px+pw/2,cy=py+ph/2;
+   const nm=String(p.name||'').slice(0,8);
+   return `<g class="ab-part">`
+    +`<rect x="${px.toFixed(1)}" y="${py.toFixed(1)}" width="${pw.toFixed(1)}" height="${ph.toFixed(1)}" rx="3" fill="${gcol(p.grade)}" fill-opacity=".88"/>`
+    +`<text class="ab-pname" x="${cx.toFixed(1)}" y="${(cy+13).toFixed(1)}">${nm}</text>`
+    +`<circle class="ab-badge" cx="${cx.toFixed(1)}" cy="${(cy-3).toFixed(1)}" r="8.5"/>`
+    +`<text class="ab-bnum" x="${cx.toFixed(1)}" y="${(cy+0.5).toFixed(1)}">${p.n!=null?p.n:''}</text>`
+    +`</g>`;
+  }).join('');
+  board=`<svg class="anat-board" viewBox="-6 -6 ${BW+12} ${BH+12}" role="img">`
+   +`<rect class="ab-bg" x="0" y="0" width="${BW}" height="${BH}" rx="${round}"/>${cells}</svg>`;
+ }else if(placed.length){
+  /* ── V2.7.1 通用富渲染分支 ── */
+  const BW=Math.max(160,Number(bd.w)||320),BH=Math.max(110,Number(bd.h)||210);
+  /* 剖面视图：按 parts 顺序把每个 part 自动堆叠成上下层（覆盖其 x/h，保留 grade/n/name）*/
+  const ABS=!section && placed.some(p=>[p.x,p.y,p.w,p.h].some(v=>Number(v)>100)); /* 坐标制式自动识别：非剖面下任一坐标>100=绝对(板内 px)，否则百分比 0-100；剖面恒按比例堆叠。作者两种写法都对 */
+  const lay=placed.map((p,i)=>{
+   let x=ABS?Number(p.x):Math.max(0,Math.min(100,Number(p.x))),y=ABS?Number(p.y):Math.max(0,Math.min(100,Number(p.y)));
+   let w=Math.max(4,Number(p.w)||14),h=Math.max(4,Number(p.h)||12);
+   if(section){const n=placed.length,gap=2,lh=(100-gap*(n+1))/n;x=8;w=84;h=lh;y=gap+(lh+gap)*i;}
+   const px=ABS?x:(x/100)*BW,py=ABS?y:(y/100)*BH,pw=ABS?w:(w/100)*BW,ph=ABS?h:(h/100)*BH;
+   return {p,px,py,pw,ph,cx:px+pw/2,cy:py+ph/2};
+  });
+  /* 外壳：path 逃生舱 > shape 查库 > section 默认 stack > 缺省扁平 ab-bg */
+  let shell;
+  if(bd.path) shell=`<path class="ab-shell" d="${bd.path}"/>`;
+  else if(bd.shape&&BOARD_SHELL[bd.shape]) shell=BOARD_SHELL[bd.shape](BW,BH);
+  else if(section) shell=BOARD_SHELL.stack(BW,BH);
+  else shell=`<rect class="ab-bg" x="0" y="0" width="${_f1(BW)}" height="${_f1(BH)}" rx="9"/>`;
+  /* 部件图元：parts[].path 逃生舱 > parts[].shape 查库 > section 默认 stack-layer > rect 兜底 */
+  const glyphs=lay.map(L=>{const p=L.p,fill=gcol(p.grade);
+   let g;
+   if(p.path) g=`<path d="${p.path}" fill="${fill}" fill-opacity=".9"/>`;
+   else{const fn=PART_GLYPH[p.shape]||(section?PART_GLYPH['stack-layer']:PART_GLYPH.rect);g=fn(L.px,L.py,L.pw,L.ph,fill,p);}
+   const nm=String(p.name||'').slice(0,9);
+   return `<g class="ab-part">${g}<text class="ab-pname" x="${_f1(L.cx)}" y="${_f1(L.cy+3)}">${nm}</text></g>`;
+  }).join('');
+  /* 外置 leader-line 标注：徽标放左/右边距 + 0.5px 虚线牵到部件；空间窄/labels:false → 回退 on-part 徽标 */
+  const M=wantLabel?64:0;  /* 左右各留 64px 标签边距 */
+  const lefts=[],rights=[];
+  if(wantLabel){
+   /* 按部件中心在左半/右半分组，组内按 y 排序，纵向均分边距槽位 */
+   lay.forEach(L=>{(L.cx<BW/2?lefts:rights).push(L);});
+   lefts.sort((a,b)=>a.cy-b.cy);rights.sort((a,b)=>a.cy-b.cy);
+  }
+  const slot=(arr,side)=>arr.map((L,i)=>{
+   const n=arr.length,sy=(BH/(n+1))*(i+1);
+   const bx=side==='L'?-M+14:BW+M-14,tx=side==='L'?-M+30:BW+M-30;
+   const p=L.p;
+   return `<line class="ab-lead" x1="${_f1(L.cx)}" y1="${_f1(L.cy)}" x2="${_f1(bx+(side==='L'?9:-9))}" y2="${_f1(sy)}"/>`
+    +`<circle class="ab-badge" cx="${_f1(bx)}" cy="${_f1(sy)}" r="8.5"/>`
+    +`<text class="ab-bnum" x="${_f1(bx)}" y="${_f1(sy+0.5)}">${p.n!=null?p.n:''}</text>`;
+  }).join('');
+  let badges;
+  if(wantLabel){badges=slot(lefts,'L')+slot(rights,'R');}
+  else{ /* on-part 徽标回退 */
+   badges=lay.map(L=>`<circle class="ab-badge" cx="${_f1(L.cx)}" cy="${_f1(L.py+9)}" r="8.5"/><text class="ab-bnum" x="${_f1(L.cx)}" y="${_f1(L.py+12.5)}">${L.p.n!=null?L.p.n:''}</text>`).join('');
+  }
+  const vbX=-6-M,vbW=BW+12+M*2;
+  board=`<svg class="anat-board" viewBox="${_f1(vbX)} -6 ${_f1(vbW)} ${BH+12}" role="img">${shell}${glyphs}${badges}</svg>`;
+ }
+ /* ② 图例表（HTML）— 始终渲染（板缺坐标时这是唯一输出）*/
+ const rows=parts.map(p=>{
+  const co=stripsec(p.co), sec=p.sec?`<span class="sec">${p.sec}</span>`:'';
+  const gr=isFinite(Number(p.grade))?`<span class="gr">${stars(Number(p.grade))}</span>`:'';
+  const link=p.link?p.link:'<span class="lg-dash">—</span>';
+  return `<tr style="background:${gtint(p.grade)}">`
+   +`<td class="lg-n">${p.n!=null?p.n:''}</td>`
+   +`<td class="lg-nm">${p.name||''}${gr}</td>`
+   +`<td>${p.fn||'<span class="lg-dash">→需补</span>'}</td>`
+   +`<td>${link}</td>`
+   +`<td class="lg-co">${co||'<span class="lg-dash">—</span>'}${sec}</td></tr>`;
+ }).join('');
+ const tbl=`<table class="anat-leg"><thead><tr><th>#</th><th>部件</th><th>功能</th><th>连接</th><th>公司</th></tr></thead><tbody>${rows}</tbody></table>`;
+ const note=c.legendnote?`<div class="anat-note">▸ ${c.legendnote}</div>`:'';
+ const cc=Object.assign({readhint:'板上编号徽标（外侧 ↔ 0.5px 虚线引线牵到部件）与下表 # 一一对应；色深=越卡脖子（grade 5→1：oxblood→faint）'+(placed.length?'':' · ⚠ 部件缺坐标，已降级为纯图例表')},c);
+ return `<figure class="vizfig">${figHead(cc,'实体标注解剖图')}<div class="anat">${board}${tbl}${note}</div>${figFoot(cc)}</figure>`;
+}
+
+/* ===== 全文 markdown 渲染（零删减）===== */
+const md=window.markdownit({html:true,linkify:false,breaks:false});
+document.getElementById('content').innerHTML=md.render(document.getElementById('md').textContent);
+document.querySelectorAll('#content h1,#content h2,#content h3').forEach(h=>{h.id=h.textContent.replace(/[\s、：·（）()\[\]/.,#]/g,'')});
+/* 表格包横向滚动容器（防溢出/竖排）*/
+document.querySelectorAll('#content table').forEach(t=>{const w=document.createElement('div');w.className='tablewrap';t.parentNode.insertBefore(w,t);w.appendChild(t);});
+/* mermaid 复活 */
+document.querySelectorAll('#content code.language-mermaid').forEach(el=>{const d=document.createElement('div');d.className='mermaid';d.textContent=el.textContent;el.closest('pre').replaceWith(d);});
+if(typeof mermaid!=='undefined'){try{mermaid.initialize({startOnLoad:false,theme:'base',themeVariables:{fontFamily:'PingFang SC,sans-serif',fontSize:'13px'},flowchart:{nodeSpacing:28,rankSpacing:32,useMaxWidth:true}});mermaid.run({querySelector:'#content .mermaid'});}catch(e){}}
+/* ASCII <pre> → 渲染图。优先读紧邻前的 <!--VIZ:KEY--> 标记（稳健，V2.5.2+）；
+   无标记则回退关键词 sentinel（兼容老报告） */
+function vizKey(pre){let n=pre.previousSibling,hop=0;while(n&&hop<4){if(n.nodeType===8){const m=/VIZ:(\w+)/.exec(n.nodeValue);if(m)return m[1];}if(n.nodeType===1)break;n=n.previousSibling;hop++;}return null;}
+function kwKey(t){if(t.includes('产业链全景'))return'chain';if(t.includes('资金流总览')||t.includes('价值传导'))return'valueflow';if(t.includes('世界分布'))return'geo';if(t.includes('不可或缺'))return'bubble';if(t.includes('Embryonic')&&t.includes('卡脖子'))return'lifecycle';return null;}
+let _vid=0;
+document.querySelectorAll('#content pre').forEach(pre=>{try{
+ const key=vizKey(pre)||kwKey(pre.textContent);
+ if(!key) return;
+ const base=key.split('_')[0], xdata=CH[key];
+ if(key==='chain' && CH.chain){const w=document.createElement('div');w.innerHTML=buildChain(CH.chain);pre.replaceWith(w.firstChild);return;}
+ if(key==='valueflow' && CH.valueflow){const w=document.createElement('div');w.innerHTML=buildValueflow(CH.valueflow);pre.replaceWith(w.firstChild);return;}
+ if(key==='anatomy' && CH.anatomy){const w=document.createElement('div');w.innerHTML=renderAnatomy(CH.anatomy);pre.replaceWith(w.firstChild);return;}
+ if(key==='geo' && CH.geo){pre.id='geo_'+(++_vid);renderGeo(pre,CH.geo);return;}
+ if(key==='bubble' && CH.bubble){pre.id='bub_'+(++_vid);renderBubble(pre,CH.bubble);return;}
+ if(key==='lifecycle' && CH.lifecycle){pre.id='lc_'+(++_vid);renderLifecycle(pre,CH.lifecycle);return;}
+ if(base==='timeline' && xdata){pre.id='v_'+(++_vid);renderTimeline(pre,xdata);return;}
+ if(base==='scorecard' && xdata){pre.id='v_'+(++_vid);renderScorecard(pre,xdata);return;}
+ if(base==='gauge' && xdata){pre.id='v_'+(++_vid);renderGauge(pre,xdata);return;}
+ if(base==='network' && xdata){pre.id='v_'+(++_vid);renderNetwork(pre,xdata);return;}
+ if(base==='cycle' && xdata){pre.id='v_'+(++_vid);renderCycle(pre,xdata);return;}
+ if(base==='trend' && xdata){pre.id='v_'+(++_vid);renderTrend(pre,xdata);return;}
+ if(base==='benchbar' && xdata){pre.id='v_'+(++_vid);renderBenchbar(pre,xdata);return;}
+}catch(_e){console.warn('viz 渲染跳过（单图异常，不影响其它）:',_e);}});
+/* A线增强：标记后无 <pre> 时，图直接插在 <!--VIZ:KEY--> 标记处（正文表格保留作零删减详情）*/
+(function(){
+ const R={geo:renderGeo,bubble:renderBubble,lifecycle:renderLifecycle,timeline:renderTimeline,scorecard:renderScorecard,gauge:renderGauge,network:renderNetwork,cycle:renderCycle,trend:renderTrend,benchbar:renderBenchbar};
+ const cw=document.createTreeWalker(document.getElementById('content'),NodeFilter.SHOW_COMMENT);
+ const nodes=[];let n;while(n=cw.nextNode())nodes.push(n);
+ nodes.forEach(node=>{try{
+  const m=/VIZ:(\w+)/.exec(node.nodeValue);if(!m)return;
+  const key=m[1],base=key.split('_')[0],data=CH[key];if(!data)return;
+  const nx=node.nextElementSibling;
+  if(nx&&nx.classList&&nx.classList.contains('vizfig'))return; // pre-loop 已渲染，跳过
+  const ph=document.createElement('div');ph.id='vp_'+(++_vid);node.parentNode.insertBefore(ph,node.nextSibling);
+  if(base==='chain'){const w=document.createElement('div');w.innerHTML=buildChain(data);ph.replaceWith(w.firstChild);}
+  else if(base==='valueflow'){const w=document.createElement('div');w.innerHTML=buildValueflow(data);ph.replaceWith(w.firstChild);}
+  else if(base==='anatomy'){const w=document.createElement('div');w.innerHTML=renderAnatomy(data);ph.replaceWith(w.firstChild);}
+  else if(R[base]) R[base](ph,data);
+  else ph.remove();
+ }catch(_e){console.warn('viz2 渲染跳过:',_e);}});
+})();
+/* ticker → Yahoo Finance 超链接（点 ticker 跳转）*/
+try{(function(){
+ const keys=Object.keys(TK).sort((a,b)=>b.length-a.length);
+ if(!keys.length) return;
+ const esc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+ const re=new RegExp('(?<![A-Za-z0-9.$])('+keys.map(esc).join('|')+')(?![A-Za-z0-9])','g');
+ const SKIP={A:1,SCRIPT:1,STYLE:1,CODE:1,PRE:1};  /* 不在已有链接 / 代码块 / ASCII pre 内 linkify */
+ const walk=document.createTreeWalker(document.getElementById('content'),NodeFilter.SHOW_TEXT,{acceptNode:n=>{
+   if(SKIP[n.parentNode.nodeName]) return NodeFilter.FILTER_REJECT;
+   return re.test(n.nodeValue)?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_SKIP;
+ }});
+ const todo=[];let n;while(n=walk.nextNode())todo.push(n);
+ todo.forEach(node=>{
+  re.lastIndex=0;
+  const frag=document.createDocumentFragment();let last=0,m;
+  while(m=re.exec(node.nodeValue)){
+   if(m.index>last)frag.appendChild(document.createTextNode(node.nodeValue.slice(last,m.index)));
+   const a=document.createElement('a');a.className='tk-link';a.href=TK[m[1]];a.target='_blank';a.rel='noopener';a.textContent=m[1];
+   frag.appendChild(a);last=m.index+m[1].length;
+  }
+  if(last<node.nodeValue.length)frag.appendChild(document.createTextNode(node.nodeValue.slice(last)));
+  node.parentNode.replaceChild(frag,node);
+ });
+})();}catch(e){/* 老浏览器无 lookbehind 时静默跳过 ticker linkify，不影响其他渲染 */}
+window.addEventListener('resize',()=>document.querySelectorAll('.chart,.vchart').forEach(c=>{const i=echarts.getInstanceByDom(c);i&&i.resize();}));
+</script></body></html>
