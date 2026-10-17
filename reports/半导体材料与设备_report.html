@@ -1,0 +1,1702 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
+<!-- industry-research 编辑风报告模板 · 共享底座 V2.7.1（industry/manifesto/author/techdive 共用） · 渲染由 scripts/render_report_html.py 注入
+     V2.7.0：纯加法新增 renderAnatomy = 实体标注解剖图（SVG schematic 编号 callout + 图例表，供 /techdive），不动任何现有渲染器
+     V2.7.1：renderAnatomy 升级为通用标注解剖图——data 驱动 + 可扩展原型库（BOARD_SHELL 外壳 ×5：pcb/stack/module/mech/die；
+             PART_GLYPH 部件图元 ×12：chip/die/connector/heatsink/capacitor/coil/gear/cell/lens/port/stack-layer/rect）
+             + path 逃生舱（board.path / parts[].path 给任意轮廓）+ board.view:"section" 剖面视图 + 外置 leader-line 标注。
+             三重缺省回退保证老 anatomy JSON 字节级不变；其余 14 个渲染器一字未动。
+     V2.7.1a：renderAnatomy 富分支加坐标制式自动识别（非剖面下任一坐标>100=绝对板内 px，否则百分比 0-100；剖面恒按比例堆叠）——
+              作者用绝对或百分比两种写法都渲染正确，few-shot 绝对坐标无需改写；百分比 JSON 行为不变（零回归）。 -->
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>半导体材料与设备 · 产业研究 · 编辑版</title>
+<script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+:root{
+ --paper:#faf8f3; --paper2:#f3efe5; --ink:#1c1a17; --ink2:#3a352d;
+ --muted:#6b655c; --faint:#a89e8c; --line:#e0d9cb; --line2:#cbbfa6;
+ --ox:#8c2f23; --ox2:#a8483a; --gold:#9a7b1f; --goldbar:#c9a227;
+ --serif:"Songti SC","Source Han Serif SC","Noto Serif SC","SimSun",Georgia,serif;
+ --sans:"PingFang SC","Microsoft YaHei","Segoe UI",-apple-system,sans-serif;
+}
+*{box-sizing:border-box} html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink2);font-family:var(--sans);font-size:16px;line-height:1.85;-webkit-font-smoothing:antialiased}
+.page{max-width:768px;margin:0 auto;padding:0 26px 120px}
+/* masthead */
+.masthead{padding:60px 0 30px;border-bottom:3px double var(--line2);margin-bottom:8px}
+.masthead .kick{letter-spacing:.3em;font-size:11px;color:var(--ox);text-transform:uppercase;margin-bottom:18px}
+.masthead h1{font-family:var(--serif);font-weight:700;font-size:52px;line-height:1.04;letter-spacing:-1px;color:var(--ink);margin:0 0 14px;max-width:9em}
+.masthead .standfirst{font-family:var(--serif);font-size:19px;line-height:1.6;color:var(--ink2);max-width:30em;margin:0 0 22px}
+.masthead .meta{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:14px}
+.masthead .meta b{color:var(--ink);font-weight:600}
+/* dashboard — stacked full width */
+.dash{margin:34px 0 10px}
+.dash .dh{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+.figrow{margin:30px 0;padding-top:22px;border-top:1px solid var(--line)}
+.figrow:first-of-type{border-top:none}
+.figrow h4{font-family:var(--serif);font-size:18px;color:var(--ink);margin:0 0 2px;font-weight:700}
+.figrow .cap{font-size:12.5px;color:var(--muted);margin:0 0 12px}
+.chart{width:100%}
+@media(max-width:640px){.masthead h1{font-size:38px}}
+/* body typography */
+#content h1{font-family:var(--serif);font-weight:700;font-size:33px;line-height:1.15;color:var(--ink);margin:64px 0 6px;padding-top:26px;border-top:1px solid var(--line2);letter-spacing:-.5px}
+#content h1:first-child{border-top:none;padding-top:0;margin-top:30px}
+#content h2{font-family:var(--serif);font-weight:700;font-size:23px;color:var(--ink);margin:42px 0 10px}
+#content h3{font-weight:700;font-size:16px;color:var(--ox);letter-spacing:.02em;margin:30px 0 8px}
+#content h4{font-weight:700;font-size:14.5px;color:var(--ink2);margin:22px 0 6px}
+#content p{margin:0 0 16px;text-align:justify}
+#content a{color:var(--ox);text-decoration:none;border-bottom:1px solid var(--line2)}
+#content strong{color:var(--ink);font-weight:700}
+#content em{color:var(--ox2);font-style:normal;background:linear-gradient(transparent 60%,#f0e6cf 60%)}
+#content ul,#content ol{margin:0 0 18px;padding-left:1.3em}
+#content li{margin:0 0 7px}
+#content ul li::marker{color:var(--ox)}
+#content blockquote{margin:22px 0;padding:4px 0 4px 22px;border-left:3px solid var(--gold);font-family:var(--serif);font-size:18px;line-height:1.6;color:var(--ink);font-style:italic}
+#content hr{border:none;border-top:1px solid var(--line);margin:34px 0}
+#content code{font-family:"SF Mono",Menlo,monospace;font-size:.82em;background:var(--paper2);padding:1px 5px;border-radius:3px;color:var(--ox)}
+#content pre{background:#221f1a;color:#e6ddc9;border-radius:6px;padding:18px 20px;overflow-x:auto;font-size:12px;line-height:1.55;margin:20px 0;box-shadow:inset 0 0 0 1px #000}
+#content pre code{background:none;color:inherit;padding:0;font-size:12px}
+/* tables — editorial + 防竖排 + 横向滚动 */
+.tablewrap{overflow-x:auto;margin:22px 0;-webkit-overflow-scrolling:touch}
+#content table{width:100%;border-collapse:collapse;margin:0;font-size:13px;line-height:1.5;table-layout:auto}
+#content th,#content td{word-break:keep-all;overflow-wrap:break-word}
+#content thead th{font-weight:700;color:var(--ink);text-align:left;border-bottom:2px solid var(--ink);padding:8px 10px;background:var(--paper2);white-space:nowrap}
+#content tbody td{padding:7px 10px;border-bottom:1px solid var(--line);color:var(--ink2);vertical-align:top}
+#content tbody td:first-child,#content thead th:first-child{white-space:nowrap;font-weight:600;color:var(--ink)}
+#content tbody tr:hover{background:#f5f1e7}
+/* ticker → Yahoo 链接 */
+a.tk-link{color:var(--ox);border-bottom:1px dotted var(--ox2);font-family:"SF Mono",Menlo,monospace;font-size:.94em;white-space:nowrap}
+a.tk-link::after{content:"↗";font-size:.7em;vertical-align:super;opacity:.6;margin-left:1px}
+/* inline rendered figure */
+.vizfig{margin:24px 0 30px}
+.vizfig figcaption{font-family:var(--serif);font-size:13px;color:var(--muted);font-style:italic;margin:0 0 3px;padding-left:12px;border-left:3px solid var(--gold)}
+/* V2.6 卖方级图表描述：结论式副标题 + 数据源脚注（全图共用 figHead/figFoot）*/
+.vfig-sub{font-family:var(--serif);font-size:15.5px;line-height:1.5;color:var(--ink);font-weight:700;margin:0 0 12px;padding-left:12px}
+.vfig-foot{margin-top:11px;padding-top:7px;border-top:1px dotted var(--line2);font-size:10.5px;color:var(--faint);display:flex;flex-wrap:wrap;gap:3px 18px}
+.vfig-foot .vfig-hint{font-style:italic}
+.vfig-foot .vfig-src{margin-left:auto}
+.vchart{width:100%}
+.mermaid{text-align:center;margin:22px 0}
+/* editorial chain diagram */
+.chain-fig{margin:4px 0 8px}
+.clayer{display:grid;grid-template-columns:74px 1fr;gap:0 20px;padding:20px 0;border-top:1px solid var(--line)}
+.clayer:last-child{border-bottom:1px solid var(--line)}
+.clayer .num{font-family:var(--serif);font-size:50px;line-height:.82;color:var(--line2);font-weight:700}
+.clayer.bn .num{color:var(--ox)} .clayer.hi .num{color:var(--gold)}
+.clayer .lname{font-size:17px;font-weight:700;color:var(--ink)}
+.clayer .lname .stars{color:var(--goldbar);font-size:12px;letter-spacing:1px;margin-left:9px}
+.clayer .ldef{color:var(--muted);font-size:12.5px;margin:3px 0 11px;line-height:1.6}
+.clayer .plist{font-size:14px;line-height:2.05;color:var(--ink2)}
+.clayer .pl .sup{font-size:10px;vertical-align:super;font-weight:700;margin-right:1px}
+.clayer .sep{color:var(--line2);margin:0 8px}
+.clayer .tk{font-size:11px;color:var(--ox);font-weight:600;font-family:"SF Mono",monospace}
+.clayer .pv{font-size:10px;color:var(--faint);border:1px solid var(--line2);border-radius:3px;padding:0 3px;margin-left:2px}
+.clayer .sh{color:var(--gold);border-bottom:2px solid var(--goldbar);font-weight:700}
+.clayer .note{display:block;font-size:12px;color:var(--ox);margin-top:6px;font-style:italic;font-family:var(--serif)}
+.chain-legend{display:flex;flex-wrap:wrap;gap:7px 18px;font-size:11.5px;color:var(--muted);margin:8px 0 0;padding-top:12px;border-top:1px dashed var(--line2)}
+.chain-legend .sup{font-size:10px;vertical-align:super;font-weight:700;margin-right:2px}
+.natus{color:#8c2f23}.nateu{color:#1e7e4f}.natcn{color:#b8860b}.natres{color:#8a8a8a}.natgate{color:#6d4c9a}
+/* value-flow 富渲染 */
+.vf{font-family:var(--sans)}
+.vf .vf-h{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);margin:18px 0 8px}
+.vf-src{background:var(--paper2);border-radius:8px;padding:14px 18px}
+.vf-src .s{font-size:13.5px;line-height:1.7;color:var(--ink2)}
+.vf-src .s b{color:var(--ink)}
+.vf-conn{text-align:center;color:var(--line2);font-size:13px;margin:8px 0;letter-spacing:2px}
+.vf-layer{position:relative;border:1px solid var(--line);border-left:4px solid var(--line2);border-radius:8px;padding:13px 16px;margin:10px 0;background:#fff}
+.vf-layer.pool{border-left-color:var(--goldbar);background:linear-gradient(100deg,#fbf6e6,#fff 60%)}
+.vf-layer.tuna{border-left-color:var(--ox)}
+.vf-layer .lh{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.vf-layer .id{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--ox);line-height:1}
+.vf-layer.pool .id{color:var(--gold)}
+.vf-layer .nm{font-size:15.5px;font-weight:700;color:var(--ink)}
+.vf-layer .nat{font-size:11.5px;color:#fff;background:var(--muted);border-radius:10px;padding:1px 8px}
+.vf-layer.pool .nat{background:var(--gold)} .vf-layer.tuna .nat{background:var(--ox)}
+.vf-layer .annot{margin-left:auto;font-size:11.5px;color:var(--ox);font-style:italic;font-family:var(--serif)}
+.vf-layer .pl{font-size:13px;color:var(--ink2);margin-top:7px;line-height:1.7}
+.vf-layer .pl .dot{color:var(--line2);margin:0 6px}
+.vf-layer .key{font-size:12px;color:var(--gold);margin-top:6px;font-weight:600}
+.vf-flownote{font-size:12px;color:var(--muted);font-style:italic;text-align:center;margin:4px 0;font-family:var(--serif)}
+.vf-div{display:flex;align-items:center;gap:12px;margin:22px 0 6px;color:var(--ink);font-weight:700;font-size:14px}
+.vf-div::before,.vf-div::after{content:"";flex:1;height:1px;background:var(--line2)}
+.vf-pools{counter-reset:pool;display:grid;gap:8px;margin-top:6px}
+.vf-pool{display:flex;align-items:baseline;gap:10px;background:#fff;border:1px solid var(--line);border-radius:7px;padding:9px 14px;font-size:13.5px}
+.vf-pool .pn{font-family:var(--serif);font-weight:700;color:var(--gold);font-size:16px;flex:none;width:18px}
+.vf-pool .pt{color:var(--ink2)} .vf-pool .pt b{color:var(--ink)}
+.vf-pool .pg{margin-left:auto;color:var(--goldbar);font-size:11px;white-space:nowrap}
+.vf-take{margin-top:16px;padding:14px 18px;background:#241f17;color:#f0e6cf;border-radius:8px;font-size:14px;line-height:1.7}
+.vf-take b{color:#f4c95d}
+/* 生命周期 × 卡脖子定位矩阵（A.2）*/
+.lcm{display:grid;gap:3px;margin:8px 0 4px;font-family:var(--sans);font-size:12.5px}
+.lcm .lc-corner{font-family:var(--serif);font-size:11px;color:var(--muted);padding:8px;display:flex;align-items:center;background:var(--paper2);border-radius:3px}
+.lcm .lc-h{color:#fff;font-weight:700;text-align:center;padding:7px 4px;border-radius:3px;font-size:12px}
+.lcm .lc-row{font-family:var(--serif);font-weight:700;color:var(--ink);padding:8px;display:flex;align-items:center;background:var(--paper2);border-radius:3px}
+.lcm .lc-cell{padding:7px 6px;border-radius:3px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:36px}
+.lcm .lc-chip{background:#fff;border:1px solid var(--line2);border-radius:4px;padding:1px 7px;color:var(--ink2);font-size:12px;white-space:nowrap}
+.lcm .lc-dash{color:var(--faint)}
+/* timeline 时间线（作品/catalyst/事件）*/
+.tl{position:relative;margin:6px 0 4px;padding-left:4px;border-left:2px solid var(--line2)}
+.tl-it{position:relative;padding:0 0 16px 20px}
+.tl-it::before{content:"";position:absolute;left:-7px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--ox);border:2px solid var(--paper)}
+.tl-it.up::before{background:var(--gold)}
+.tl-it .d{font-family:"SF Mono",Menlo,monospace;font-size:11px;color:var(--ox);font-weight:600}
+.tl-it .t{font-weight:700;color:var(--ink);font-size:14px;margin:1px 0}
+.tl-it .x{color:var(--muted);font-size:12.5px;line-height:1.6}
+.tl-it .tag{font-size:10px;color:#fff;background:var(--gold);border-radius:3px;padding:0 6px;margin-left:6px;vertical-align:middle}
+/* scorecard 命中率卡 */
+.scard{margin:6px 0 4px}
+.scard .hr{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}
+.scard .hr .big{font-family:var(--serif);font-size:40px;font-weight:700;color:var(--ox);line-height:1}
+.scard .hr .lb{font-size:13px;color:var(--muted)}
+.scard .row{display:grid;grid-template-columns:22px 84px 1fr;gap:0 10px;padding:8px 0;border-top:1px solid var(--line);align-items:start;font-size:13px}
+.scard .row:last-child{border-bottom:1px solid var(--line)}
+.scard .ic{font-weight:700;text-align:center}
+.scard .ic.hit{color:#1e7e4f}.scard .ic.miss{color:#c0392b}.scard .ic.part{color:var(--gold)}
+.scard .dt{font-family:"SF Mono",Menlo,monospace;font-size:11px;color:var(--faint)}
+.scard .pr b{color:var(--ink)}.scard .pr .nt{color:var(--muted);font-size:12px;display:block;margin-top:2px}
+/* gauge 评分仪表 */
+.gau{margin:6px 0 4px}
+.gau .top{display:flex;align-items:baseline;gap:8px;margin-bottom:12px}
+.gau .top .big{font-family:var(--serif);font-size:40px;font-weight:700;color:var(--gold);line-height:1}
+.gau .top .mx{font-size:14px;color:var(--faint)}
+.gau .top .lb{font-size:13px;color:var(--ink2);margin-left:6px}
+.gau .sub{display:grid;grid-template-columns:130px 1fr 46px;gap:7px 10px;align-items:center;font-size:12.5px;margin-top:6px}
+.gau .sub .nm{color:var(--ink2)}
+.gau .bar{height:8px;background:var(--paper2);border-radius:4px;overflow:hidden}
+.gau .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),var(--goldbar))}
+.gau .sub .vv{color:var(--muted);font-size:11px;text-align:right}
+/* cycle 双轴定位（生命周期 S 曲线 × 周期相位）*/
+.cyc{margin:6px 0 4px}
+.cyc-ax{margin:12px 0 6px}
+.cyc-lbl{font-size:12.5px;color:var(--ink2);margin-bottom:2px}
+.cyc-lbl b{color:var(--ox);font-weight:700}
+.cyc svg{width:100%;height:auto;display:block;overflow:visible}
+.cyc-sig{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:16px}
+@media(max-width:560px){.cyc-sig{grid-template-columns:1fr}}
+.cyc-sig .col h5{margin:0 0 5px;font-size:11.5px;font-weight:700;letter-spacing:.02em}
+.cyc-sig .danger h5{color:#c0392b}.cyc-sig .safe h5{color:#1e7e4f}.cyc-sig .watch h5{color:var(--gold)}
+.cyc-sig ul{margin:0;padding-left:1.05em;line-height:1.5}
+.cyc-sig li{margin:0 0 4px;color:var(--ink2);font-size:12px}
+.cyc-bm{margin-top:14px;padding:10px 14px;background:var(--paper2);border-radius:6px;font-size:12px;color:var(--ink2);line-height:1.6}
+.cyc-bm b{color:var(--ink)}
+.cyc-basis{margin-top:13px;font-size:12px;color:var(--ink2);line-height:1.6}
+.cyc-basis b{color:var(--gold)}
+.cyc-syn{margin-top:13px;padding:11px 15px;background:#241f17;color:#f0e6cf;border-radius:7px;font-size:13px;line-height:1.65;font-weight:600}
+/* trend 强度指标时序小多图（周期证据层）*/
+.tr{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:14px;margin:6px 0 4px}
+.tr-cell{border:1px solid var(--line);border-radius:7px;padding:10px 12px;background:#fff}
+.tr-nm{font-size:12px;font-weight:700;color:var(--ink);margin-bottom:5px;line-height:1.3}
+.tr svg{width:100%;height:auto;display:block}
+.tr-foot{display:flex;align-items:baseline;justify-content:space-between;margin-top:5px}
+.tr-val{font-family:"SF Mono",Menlo,monospace;font-size:14px;font-weight:700;color:var(--ink)}
+.tr-dir{font-size:15px;font-weight:700;line-height:1}
+.tr-note{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.45}
+/* benchbar 当前 vs 历史泡沫阈值对标条 */
+.bb{margin:6px 0 4px}
+.bb-an{font-size:12px;color:var(--muted);margin-bottom:12px}
+.bb-an b{color:var(--ox)}
+.bb-row{display:grid;grid-template-columns:148px 1fr 150px;gap:6px 12px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.bb-row:last-child{border-bottom:1px solid var(--line)}
+.bb-nm{font-size:12.5px;color:var(--ink2);font-weight:600}
+.bb-track{position:relative;height:13px;background:var(--paper2);border-radius:7px}
+.bb-fill{height:100%;border-radius:7px}
+.bb-thr{position:absolute;top:-4px;width:2px;height:21px;background:var(--ink);opacity:.72}
+.bb-anmark{position:absolute;top:50%;width:9px;height:9px;background:var(--ox);transform:translate(-50%,-50%) rotate(45deg);border:1px solid #faf8f3}
+.bb-val{font-size:12px}
+.bb-val b{font-family:"SF Mono",Menlo,monospace}
+.bb-dir{font-size:9.5px;color:var(--faint);font-weight:400;margin-left:6px;white-space:nowrap}
+.bb-refline{display:block;font-size:9.5px;color:var(--faint);margin-top:2px}
+.bb-ref{color:var(--ox)}
+.bb-note{grid-column:1/-1;font-size:11px;color:var(--muted);margin:2px 0 0;padding-left:160px;line-height:1.4}
+@media(max-width:560px){.bb-row{grid-template-columns:1fr}.bb-note{padding-left:0}}
+/* anatomy 实体标注解剖图（编号 callout schematic + 图例表 · /techdive 技术详解）*/
+.anat{margin:6px 0 4px}
+.anat-board{width:100%;height:auto;display:block;background:var(--paper2);border:1px solid var(--line2);border-radius:8px}
+.anat-board .ab-bg{fill:#f6f1e4;stroke:var(--line2);stroke-width:1.5}
+.anat-board .ab-part rect{stroke:var(--paper);stroke-width:1.5;rx:3}
+.anat-board .ab-badge{fill:var(--ink);stroke:var(--paper);stroke-width:1.5}
+.anat-board .ab-bnum{fill:#faf8f3;font-family:var(--serif);font-weight:700;font-size:11px;text-anchor:middle}
+.anat-board .ab-pname{fill:var(--ink2);font-family:var(--sans);font-size:8.5px;text-anchor:middle}
+/* V2.7.1 通用原型外壳 / 部件图元 / 外置 leader-line 标注 */
+.anat-board .ab-shell{fill:#f1ead9;stroke:var(--line2);stroke-width:1.4}
+.anat-board .ab-shell2{fill:#e9e0cb;stroke:var(--line2);stroke-width:1.2}
+.anat-board .ab-edge{fill:none;stroke:var(--line2);stroke-width:1.2}
+.anat-board .ab-edge-d{fill:none;stroke:var(--faint);stroke-width:.8;stroke-dasharray:3 3}
+.anat-board .ab-trace{fill:none;stroke:#c9a227;stroke-width:.8;opacity:.5}
+.anat-board .ab-metal{fill:#d8cdb4;stroke:var(--line2);stroke-width:1.2}
+.anat-board .ab-hole{fill:var(--paper2);stroke:var(--line2);stroke-width:1}
+.anat-board .ab-pin{stroke:#6b655c;stroke-width:1.1;stroke-linecap:round}
+.anat-board .ab-pin1{fill:#8c2f23}
+.anat-board .ab-glyph-ln{fill:none;stroke:var(--paper2);stroke-width:.9;opacity:.65}
+.anat-board .ab-lead{fill:none;stroke:var(--faint);stroke-width:.5;stroke-dasharray:2.5 2.5}
+.anat-board .ab-tsv{fill:none;stroke:#a8483a;stroke-width:1.1;stroke-dasharray:2 2;opacity:.7}
+.anat-board .ab-pname-o{fill:var(--muted);font-family:var(--sans);font-size:8px}
+.anat-leg{width:100%;border-collapse:collapse;margin:14px 0 0;font-size:12.5px;line-height:1.5}
+.anat-leg th{font-weight:700;color:var(--ink);text-align:left;border-bottom:2px solid var(--ink);padding:7px 9px;background:var(--paper2);white-space:nowrap}
+.anat-leg td{padding:7px 9px;border-bottom:1px solid var(--line);color:var(--ink2);vertical-align:top}
+.anat-leg tr:hover td{background:#f5f1e7}
+.anat-leg .lg-n{font-family:var(--serif);font-weight:700;color:var(--ox);text-align:center;white-space:nowrap}
+.anat-leg .lg-nm{font-weight:600;color:var(--ink);white-space:nowrap}
+.anat-leg .lg-nm .gr{color:var(--goldbar);font-size:10px;letter-spacing:.5px;margin-left:5px}
+.anat-leg .lg-co{font-family:"SF Mono",Menlo,monospace;font-size:11px;color:var(--ox);white-space:nowrap}
+.anat-leg .lg-co .sec{color:var(--faint);font-family:var(--sans);font-size:10px;margin-left:4px}
+.anat-leg .lg-dash{color:var(--faint)}
+.anat-note{margin-top:11px;font-size:11.5px;color:var(--muted);line-height:1.6;font-style:italic;font-family:var(--serif)}
+.colophon{margin-top:60px;padding-top:20px;border-top:3px double var(--line2);font-size:12px;color:var(--faint)}
+/* 打印 / 导出 PDF：图与卡片不跨页截断，去链接下划线噪点 */
+@media print{
+ body{font-size:12pt} .page{max-width:none;padding:0 12mm 12mm}
+ .vizfig,.clayer,.vf-layer,.vf-pool,.figrow,.chart,.vchart,.tablewrap,.mermaid,.anat-board{break-inside:avoid;page-break-inside:avoid}
+ #content h1,#content h2{break-after:avoid}
+ a{color:var(--ink2)!important;border-bottom:none!important} a.tk-link::after{content:""}
+}
+</style></head>
+<body>
+<div class="page">
+ <div class="masthead">
+  <div class="kick">BCA 产业研究 · Semiconductor Materials & Equipment · 2026Q2</div>
+  <h1>半导体材料与设备</h1>
+  <div class="standfirst">2025 最刺眼的不是前道 WFE +11%，是后道测试 +48%——利润池正从光刻机房迁向封测车间</div>
+  <div class="meta"><span><b>口径</b> 全球 · 3 年视角 · 设备 $1330B + 材料 $700B</span><span><b>覆盖</b> 23 标的截图 universe + 海外命门 + 中国本土</span><span><b>真调</b> yfinance 37 标的 · 截至 2026-06</span></div>
+ </div>
+ <div class="dash"><div class="dh">— 速览 / At a Glance —</div><div id="dashboard"></div></div>
+ <div id="content"></div>
+ <div class="colophon">BCA 双线投研系统 · industry-research · 数据真实性优先（拿不到标"→需补"，绝不编造）· ticker ↗ 跳 Yahoo Finance · 本文件为研究草稿，非投资建议。</div>
+</div>
+<script type="text/markdown" id="md"># 半导体材料与设备 — 产业研究
+
+*2026Q2 · 3 年视角 · 机构卖方研报口吻*
+
+---
+
+## 目录
+
+- [一、执行摘要](#一执行摘要)
+- [二、为什么是现在](#二为什么是现在)
+- [三、产业全景与双轴定位](#三产业全景与双轴定位生命周期--周期相位)
+- [四、产业链结构](#四产业链结构)
+- [五、价值链与利润池](#五价值链与利润池)
+- [六、关键 link 深度档案](#六关键-link-深度档案)
+- [七、地缘与政策约束](#七地缘与政策约束)
+- [八、投资标的与组合建议](#八投资标的与组合建议)
+- [九、风险、证伪与月度跟踪](#九风险证伪与月度跟踪)
+- [十、邻接产业与历史类比](#十邻接产业与历史类比)
+- [十一、结论与下一步](#十一结论与下一步)
+- [附录 A：跨 link 对比矩阵](#附录-a跨-link-对比矩阵)
+- [附录 B：完整 KPI 速查表](#附录-b完整-kpi-速查表)
+- [附录 C：信息源与方法论](#附录-c信息源与方法论)
+- [附录 D：紫苏叶清单](#附录-d紫苏叶清单金枪鱼-vs-紫苏叶)
+
+---
+
+# 一、执行摘要
+
+2025 年 12 月 SEMI 年终设备预测把全球半导体设备销售从一年前的悲观情绪中彻底拉了出来：晶圆制造设备（WFE）2024 年录得 1040 亿美元后，2025 年增长 11% 至 1157 亿美元，并将连续三年扩张至 2027 年的 1352 亿美元；若计入测试与封装，2025 年总设备规模约 1330 亿美元（+13.7%），2027 年首次突破 1500 亿至 1560 亿美元。这一轮上行的引擎与 2017-18 周期截然不同。当年是智能手机与比特币矿机驱动的全面繁荣，这一次的增量高度集中在 AI 算力的三个物理瓶颈上，先进逻辑制程、HBM 高带宽内存、以及承接两者的先进封装与测试。最刺眼的数字不在前道：2025 年测试设备销售暴增 48.1% 至 112 亿美元，NAND 设备增长 45.4%，均数倍于 WFE 整体的 11%。利润池正在从晶圆厂的光刻机房向后道封测车间迁移，而市场对后道环节的重定价仍未完成。
+
+本研究跟踪 4 个核心论断（自建，锚定 SEMI、CSIA 与各环节份额数据）：
+
+- **论断 1**：设备护城河的本质是工艺 know-how 垄断，不是市场份额，ASML 的 EUV、KLA 与 Lasertec 的检测、东京电子的涂胶显影，真壁垒是几十年积累的配方与良率数据库，竞争者能买到机床却买不到 know-how → 验证位置 [§6 Link 1 / Link 3 / §7]。
+- **论断 2**：AI 把利润池从前道逻辑制程结构性迁移到后道测试与先进封装，后道 2025 增速（测试 +48% / 键合设备 ASP 抬升 3-5 倍）远超前道，被低估的重定价发生在测试与封装环节 → 验证位置 [§5 / §6 Link 4 / Link 5]。
+- **论断 3**：真正不可替代的隐形瓶颈在材料与掩膜端而非设备端，EUV 光刻胶（日本三家 ~85%）、EUV 掩膜 blanks（Hoya/AGC 双寡头 ~100%）、EUV 掩膜检测（Lasertec 独家），是被设备明星光环掩盖的分子级命门 → 验证位置 [§6 Link 6 / 附录 D]。
+- **论断 4**：中国国产替代是周期的需求扰动而非格局颠覆，35% 本土化率集中在刻蚀/沉积/清洗的中低端，EUV、高端检测与高端材料卡死；对全球龙头长期格局影响有限，但 2024 年抢装透支令 2025-26 成熟制程设备需求回落，构成 demand swing → 验证位置 [§7 / §3]。
+
+四个论断并非彼此独立，而是同一条 AI 主线的不同切面。论断 2 的后道迁移是当下最确定的现金流增量，论断 1 与论断 3 解释了为什么这条产业链的超额利润能长期沉淀在极少数玩家手里，无论金枪鱼（光刻、刻蚀设备）还是紫苏叶（掩膜、光刻胶），其共同点都是几十年壁垒构筑的不可采购性。论断 4 则是悬在估值之上的最大短期扰动：中国占全球 WFE 单一最大市场（2025 约 414 亿美元），其抢装节奏的退潮会先于 AI 上行的兑现冲击成熟制程设备商的报表。换言之，方向（AI 驱动的结构性上行）确定，但路径（中国去库 + memory 周期 + Intel 砍单）颠簸。
+
+投资动作 3 层（先简述，详见 §8）：(1) 最高确信度，后道测试与先进封装的重定价，以 ASMPT（2018.HK，EV/现金 6.2x，被严重低估的混合键合二供）+ 泰瑞达 TER 表达；(2) 配置，前道寡头的 AI 纯度溢价，KLAC 检测垄断 + LRCX 刻蚀，辅以低估的材料商 Entegris；(3) 对冲/规避，已被打满的动量标的（AEHR P/S 68x、Camtek P/E 179x）与中国成熟制程 demand swing 敞口。
+
+本报告全文约 2 万字 + 1 个 data.json。建议阅读：基金 GP 看 §1 + §8 + §11（12 min）；研究员顺读全文（60-75 min）；地缘分析师重点 §7 + §9。
+
+---
+
+# 二、为什么是现在
+
+理解这一轮设备周期的时点价值，要从一个反差极大的数字对比切入。2025 年前道 WFE 增长 11%，听上去稳健但平淡；同期后道测试设备增长 48.1%、NAND 设备增长 45.4%、DRAM 设备增长 15.4%。当一个 50 年历史的成熟工业突然有细分环节录得近 50% 的同比增速，背后一定是供需结构的断裂式重组，而非平滑的周期复苏。断裂点就是 AI 训练芯片的物理封装方式。一颗 NVIDIA GB200 不再是单一逻辑 die，而是两颗 reticle-limit 逻辑 die + 8 颗 HBM 通过 CoWoS 先进封装拼在一起的"系统级芯片"。每多堆一层 HBM、每多拼一颗 chiplet，就多一道键合、多一轮晶圆级测试、多一次老化筛选。摩尔定律在前道几乎停滞（晶体管微缩逼近原子极限），增量被迫转向后道的异质集成，这正是后道设备增速碾压前道的根本原因。
+
+值得注意的是，这一断裂并非孤立现象。台积电 CoWoS 月产能从 2023 年底的 1.3 万片扩到 2024 年中的 3-3.5 万片，计划 2025 年底达 7-8 万片、2026 年冲 10-12 万片，几乎每年翻倍仍供不应求，逼得高通这类中型客户去寻找替代封装厂。HBM 端，三星、SK 海力士、美光为 16 层 HBM4 良率瓶颈集体评估转向混合键合（Cu-Cu 直接键合），而混合键合设备单价是传统倒装芯片键合机（约 50 万美元）的 3-5 倍（150-250 万美元）。设备 ASP 的台阶式抬升，意味着即便出货台数不变，后道设备商的收入也能跳升。AMAT 在 2025 年 4 月买入混合键合龙头 BESI 9% 股权成为最大股东，ASML 亦传出评估进入后道封装，两个前道巨头同时把触角伸向后道，是对利润池迁移方向最强的产业背书。
+
+更值得关注的是时间窗口的三重叠加。其一，AI 上行刚进入中段而非尾声，SEMI 预测 WFE 2026 年再增 9%、2027 年增 7.3%，HBM 与先进逻辑是确定的三年增长引擎。其二，存储周期 2024 触底后回升，NAND 设备 2025 年 +45% 是补库存 + 3D 堆叠层数跃升的双击。其三，中国抢装的退潮恰好为成熟制程设备商创造了一个低预期的进入窗口：2024 年中国疯狂抢装拉高了基数，2025-26 去库会压制相关收入，但这是周期性而非结构性的，错杀处即机会。对比之下，2000 年互联网设备泡沫的崩塌源于需求本身的虚构，这一轮的 AI 算力需求有真实的 token 消耗与资本开支支撑，性质不同。
+
+本研究的边界需要明确。报告聚焦"卖铲人"，为晶圆厂提供设备、零部件与材料的供应商，不覆盖晶圆厂自身（台积电、三星）与芯片设计公司（除非作为设备客户出现）。截图给定的 23 个标的全部纳入，并补入未上市于美股但卡住关键命脉的海外龙头（东京电子、Advantest、信越、Hoya、Lasertec、ASMPT）与中国本土设备商（北方华创、中微、盛美），以保证全球均衡而非美股偏倚。
+
+---
+
+# 三、产业全景与双轴定位（生命周期 × 周期相位）
+
+半导体设备与材料是一个高度寡占、强周期、技术壁垒陡峭的"卖水人"产业。从市场规模看，2025 年总设备约 1330 亿美元，其中前道 WFE 1157 亿、测试 112 亿、封装约 60 亿；材料端（光刻胶、CMP、特种气体、掩膜、硅片等）另有约 700 亿美元规模。事实上，从商业模式上看，设备是高 ASP、低出货量、强客户绑定的资本品生意（一台 EUV 光刻机售价超 2 亿美元、High-NA 超 4 亿美元），材料则是高频复购的耗材生意（content-per-wafer 随节点微缩持续提升）。两种模式的共同点是技术锁定，一旦某供应商的工具/材料被验证进入某节点的量产配方，切换成本极高，这是寡占格局得以长期维持的微观基础。
+
+<!--VIZ:cycle-->
+
+## 3.0 轴①：生命周期阶段（结构性）
+
+阶段诊断是成熟期叠加 AI 注入的第二增长曲线。从增速看，设备业过去十年 CAGR 约 8-10%，是典型成熟工业；从渗透率看，半导体已渗透进几乎所有终端，不存在新品类的爆发式渗透。但 AI 在 2023 年起为这条老产业链注入了一条全新的结构性 S 曲线：先进封装、HBM、晶圆级测试、硅光这些过去的边缘环节，被 AI 算力的物理需求推到了价值链中心。利润集中度上，前五大设备商（AMAT、ASML、东京电子、LRCX、KLA）合计占 WFE 的 56-66%，集中度极高且仍在小幅提升；一级融资在设备环节基本不存在（玩家都是数十年老牌上市公司），增量资本集中流向中国本土设备商与先进封装初创。综合判断，这是一个"老树发新枝"的成熟产业，整体生命周期偏成熟，但 AI 相关子环节处于成长早中期。
+
+这个阶段意味着什么？对投资者而言，成熟产业的寡占龙头提供的是确定性而非弹性，ASML、KLA 这类标的不会给出 10 倍股的爆发，但其垄断地位带来的定价权与现金流极其稳定。真正的超额收益来自两处错配：一是被 AI 重新定义价值的后道环节（测试、封装），市场对其结构性迁移的定价滞后；二是被设备明星掩盖的材料/掩膜紫苏叶，其不可替代性远超市值反映。成熟产业的 alpha 不在主干，在主干被重新接驳的接口处。
+
+## 3.0b 轴②：当前周期相位（周期性·主导周期 = 资本开支 + 库存）
+
+半导体设备的主导周期是晶圆厂资本开支周期叠加设备商自身的库存周期。当前相位判断为复苏的早中段，但分化极为剧烈，不能笼统地说"周期向上"。向上的部分清晰：HBM/先进逻辑/先进封装/AI 测试处于扩张期，CoWoS 扩产、HBM4 量产、test +48% 都是实打实的订单。承压的部分同样清晰：成熟制程（28nm 及以上）设备因 2024 年中国抢装透支 + 消费/车规/工业需求疲软而进入去库；Intel 因自身困境将削减 2026 年资本开支，是前道的负面 swing factor；memory 端 bit 供给若过快释放可能压制 2026 下半年的设备追加。
+
+<!--VIZ:trend-->
+
+<!--VIZ:benchbar-->
+
+把"现在的判断"变成"未来什么发生则切换"，是本节最可操作的部分。
+
+| 类型 | 信号 | 当前状态 / 阈值 |
+|---|---|---|
+| ⚠ 危险（→见顶/反转）| Intel 2026 资本开支削减 | 已确认下调，前道成熟逻辑承压 |
+| ⚠ 危险 | 中国成熟制程设备订单回落 | 2024 抢装透支，2025-26 去库进行中 |
+| ⚠ 危险 | memory bit 供给过快释放 | HBM 之外的标准 DRAM/NAND 价格观察 |
+| ✓ 安全（扩张可持续）| 台积电 CoWoS 月产能 → 10-12 万片 | 仍供不应求，2026 持续扩 |
+| ✓ 安全 | 后道测试设备 2025 +48% | HBM4/16 层堆叠/AI SoC 拉动 |
+| ◉ 关键观察变量 | 台积电 2026 资本开支 guidance | 上调=前道继续扩，是最强前瞻指标 |
+| ◉ 关键观察变量 | HBM4 混合键合渗透率 | 决定 BESI/ASMPT 设备 ASP 弹性 |
+
+**历史对标**：当前相位类似 2016-17 周期的中段而非 2018 顶部，2018 年是 memory 资本开支见顶后断崖，本轮 AI/HBM 需求的真实性与持续性强于当年的存储投机性扩产。关键比率上，AI 相关设备订单/总订单占比仍在上升（安全），而成熟制程产能利用率偏低（局部危险）。结论是结构性向上、周期性中段、分化定价，配置应向 AI 纯度高的后道与检测环节集中，规避成熟制程与中国抢装敞口。
+
+## 3.1 市场规模自下而上三角验证
+
+二手 market-research 机构给出的"半导体制造设备"市场规模口径混乱（从 2025 年 1232 亿到 1663 亿美元不等，2034 年预测从 1905 亿到 3444 亿美元跨度极大），多数把不同环节混装且普遍虚高，只能作交叉参考。本节用自下而上方法锚定真实可寻址市场。
+
+自下而上拆解：2025 年总设备 = WFE 1157 亿（foundry/logic 666 亿 + DRAM 225 亿 + NAND 140 亿 + 其他逻辑/分立约 126 亿）+ 测试 112 亿 + 封装约 60 亿 ≈ 1330 亿美元，这一口径直接来自 SEMI 按应用拆分的真调数据，可信度最高。材料端独立测算：光刻胶约 39 亿（其中 EUV 仅 2.5 亿但 25% CAGR）、特种气体 75 亿、CMP 与掩膜等其余约 600 亿，材料合计约 700 亿。设备 + 材料合计约 2030 亿美元为本研究锚定的 2025 年全产业可寻址规模。
+
+| TAM 口径 | 数值 | 来源 | 可信度 |
+|---|---|---|---|
+| 自下而上（本研究·主锚）| 设备 ~1330 亿 + 材料 ~700 亿 = ~2030 亿 | SEMI 按应用拆分 + 材料分项 | ⭐⭐⭐⭐ |
+| 二手 A（设备）| 2025 ~1232 亿 / 2034 ~2127 亿 | Precedence Research | ⭐⭐ |
+| 二手 B（设备）| 2025 ~1663 亿 / 2032 ~3444 亿 | 多家咨询 11% CAGR | ⭐⭐ |
+
+主锚选 SEMI 自下而上的原因，是它直接来自设备商出货与晶圆厂资本开支的真实统计，口径透明可追溯；二手数据的虚高主要源于把材料、零部件、服务等不同口径混入"设备"市场并叠加乐观 CAGR，差异来源于口径边界而非真实增长分歧。
+
+---
+
+# 四、产业链结构
+
+半导体材料与设备产业链可以分为 7 层结构，从最上游的高纯原材料与基础光学，到最下游接收设备的晶圆厂客户，每一层都有清晰的寡占特征，且越靠近"卡脖子"环节寡占度越高。这条链的独特之处在于，它不是线性的上下游，而是设备与材料两条平行链共同喂给同一个客户（晶圆厂），设备链造"机器"，材料链造"耗材"，二者在晶圆厂的产线上汇合。
+
+下面是这条产业链的 ASCII 全景图，每一层已标注关键玩家、国别集中度与卡脖子等级。
+
+<!--VIZ:chain-->
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                   半导体材料与设备 产业链全景（2026Q2）                          │
+│             符号：⭐ 卡脖子度 / ◆ 美国 / ● 日韩欧 / ▲ 中国 / ◇ 资源国              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+【第零层：高纯原材料 / 基础光学 / 资源】
+┌────────────────────────────────────────────────────────────────────┐
+│ ⭐⭐⭐⭐⭐ EUV 光学：Zeiss SMT（●德·ASML 持股·独家）🌿                │
+│ ⭐⭐⭐⭐ 高纯石英/合成石英：信越 4063.T ● / Heraeus ●德                │
+│ ⭐⭐⭐⭐ EUV 用氖气：Air Liquide ●法(18%) / Linde ● / 大阳日酸 ●        │
+│ ⭐⭐⭐ 大尺寸硅片：信越 4063.T ● / SUMCO 3436.T ● / 环球晶 ●台          │
+└────────────────────────────────────────────────────────────────────┘
+                                  ▼
+【第一层：关键材料 / 耗材（材料链）】
+┌────────────────────────────────────────────────────────────────────┐
+│ ⭐⭐⭐⭐⭐ EUV 光刻胶：JSR(私有) / 东京应化 4186.T / 信越 4063.T ●(~85%)🌿│
+│ ⭐⭐⭐⭐⭐ EUV 掩膜 blanks：Hoya 7741.T / AGC ●(双寡头~100%)🌿          │
+│ ⭐⭐⭐⭐ CMP 浆料/垫：Entegris ENTG ◆ / 卡博特 ◆ / 富士美 ●            │
+│ ⭐⭐⭐ 特种气体/前驱体：Entegris ◆ / 林德 / 关东电化 ● / 华特气体 ▲    │
+│ ⭐⭐⭐ 光掩膜（merchant）：Photronics PLAB ◆ / 凸版 ● / DNP ●          │
+└────────────────────────────────────────────────────────────────────┘
+                                  ▼
+【第二层：⭐⭐⭐⭐⭐ 核心前道设备（设备链·利润核心）】
+┌────────────────────────────────────────────────────────────────────┐
+│ ⭐⭐⭐⭐⭐ 光刻：ASML ◆荷(EUV 100% 垄断) / 佳能 ● / 尼康 ●              │
+│ ⭐⭐⭐⭐ 刻蚀：Lam LRCX ◆ / 东京电子 8035.T ● / AMAT ◆ / 中微 688012 ▲ │
+│ ⭐⭐⭐⭐ 沉积 CVD/PVD/ALD：AMAT ◆ / 东京电子 ● / Lam ◆ / 北方华创 ▲   │
+│ ⭐⭐⭐⭐ 涂胶显影：东京电子 8035.T ●(88-90% 近垄断)                    │
+│ ⭐⭐⭐ 离子注入：AMAT ◆ / Axcelis ACLS ◆ / 退火 Veeco VECO ◆          │
+│ ⭐⭐⭐ 清洗：东京电子 ● / SCREEN ● / 盛美 ACMR/688082 ▲                │
+└────────────────────────────────────────────────────────────────────┘
+                                  ▼
+【第三层：⭐⭐⭐⭐ 量检测 / 过程控制】
+┌────────────────────────────────────────────────────────────────────┐
+│ ⭐⭐⭐⭐⭐ EUV 掩膜检测：Lasertec 6920.T ●(actinic ~100% 独家)🌿       │
+│ ⭐⭐⭐⭐ 检测/量测：KLA KLAC ◆(~50%+) / AMAT ◆ / 应用材料            │
+│ ⭐⭐⭐ 计量：Onto ONTO ◆ / Nova NVMI ◆以 / 先进封装 AOI Camtek CAMT ◆以│
+└────────────────────────────────────────────────────────────────────┘
+                                  ▼
+【第四层：⭐⭐⭐⭐ 后道封装设备（AI 利润迁移点）】
+┌────────────────────────────────────────────────────────────────────┐
+│ ⭐⭐⭐⭐⭐ 混合键合：BESI ●荷(龙头·AMAT 持 9%) / ASMPT 2018.HK ●        │
+│ ⭐⭐⭐⭐ 引线/TCB 键合：Kulicke&Soffa KLIC ◆ / ASMPT ●                 │
+│ ⭐⭐⭐ 减薄/切割：Disco 6146.T ●(near-mono) / 先进封装光刻 Veeco ◆     │
+└────────────────────────────────────────────────────────────────────┘
+                                  ▼
+【第五层：⭐⭐⭐⭐ 测试设备（AI 增速最快）】
+┌────────────────────────────────────────────────────────────────────┐
+│ ⭐⭐⭐⭐ SoC/系统级测试 ATE：泰瑞达 TER ◆(~30%) / Advantest 6857.T ●   │
+│ ⭐⭐⭐⭐ 内存/HBM 测试：Advantest ●(31%·"测试界 ASML")                 │
+│ ⭐⭐⭐⭐ 探针卡：FormFactor FORM ◆ / Technoprobe ●意🌿 / 旺矽 ●台      │
+│ ⭐⭐⭐ 晶圆级老化 WLBI：Aehr AEHR ◆(SiC/光子 独家) / 分选 Cohu COHU ◆  │
+└────────────────────────────────────────────────────────────────────┘
+                                  ▼
+【第六层：关键子系统 / 零部件（喂给第二层 OEM）】
+┌────────────────────────────────────────────────────────────────────┐
+│ ⭐⭐⭐ 真空/RF 电源：MKS MKSI ◆(RF#1) / Advanced Energy AEIS ◆ / 蔡司 ● │
+│ ⭐⭐⭐ 气体/流体输送模块：Ultra Clean UCTT ◆ / Ichor ICHR ◆ / Ebara ●  │
+│ ⭐⭐⭐ 真空泵/阀：Edwards ● / VAT ●瑞 / Horiba ●                       │
+└────────────────────────────────────────────────────────────────────┘
+                                  ▼
+【第七层：终端客户（晶圆厂 / IDM / OSAT）】
+┌────────────────────────────────────────────────────────────────────┐
+│ 先进逻辑：台积电 2330.TW / 三星 / Intel ◆                             │
+│ 存储：SK 海力士 / 三星 / 美光 ◆                                       │
+│ 特种代工：Tower TSEM ◆以(SiGe/硅光#1) / GlobalFoundries / 格芯       │
+│ OSAT：日月光 ASE / Amkor ◆ / 长电 ▲ / 实验室自动化 Azenta AZTA ◆      │
+│ 测量仪器横切：Keysight KEYS ◆(电子设计+测试)                          │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+**全景图一句话解读**：半导体材料与设备产业链是「**美国控设备广度（AMAT/Lam/KLA）+ 荷兰控光刻（ASML）+ 日本控材料与涂胶显影（信越/JSR/Hoya/东京电子/Lasertec）+ 中国争中低端国产替代（北方华创/中微/盛美）**」的多极结构。其中最深的两道墙，EUV 光刻（ASML 独家）与 EUV 上游的光学/光刻胶/掩膜/掩膜检测（Zeiss/日本三家/Hoya/Lasertec），构成整条链最不可替代的命脉，而这些紫苏叶级瓶颈的市值远小于它们卡住的产业价值。
+
+> 🌿 **紫苏叶标注**：全景图揭示的隐形瓶颈集中在第零层与第一层，Zeiss SMT（EUV 光学，ASML 独家供应，全球无第二家）、日本三家 EUV 光刻胶（~85%）、Hoya/AGC EUV 掩膜 blanks（双寡头）、Lasertec EUV 掩膜检测（actinic ~100%）。这些"买不到"的工艺 know-how 远比设备整机更接近真垄断。详见[附录 D](#附录-d紫苏叶清单金枪鱼-vs-紫苏叶)。
+
+为精确展示节点依赖关系，下面是 Mermaid 多层流程图，红色高亮节点是 Top 5 卡脖子。
+
+```mermaid
+flowchart TD
+  Z[EUV 光学 Zeiss SMT]:::bottleneck --> A[光刻 ASML EUV]:::bottleneck
+  R[EUV 光刻胶 日本三家]:::bottleneck --> A
+  M[EUV 掩膜 Hoya/AGC]:::bottleneck --> A
+  A --> ETCH[刻蚀 Lam/TEL/AMAT]
+  A --> DEP[沉积 AMAT/TEL]
+  ETCH --> INSP[检测 KLA + Lasertec 掩膜]:::bottleneck
+  DEP --> INSP
+  INSP --> PKG[先进封装 BESI/ASMPT/K&S]
+  PKG --> TEST[测试 泰瑞达/Advantest/探针卡 FORM]
+  TEST --> FAB[晶圆厂 台积电/三星/SK海力士]
+  SUB[子系统 MKS/AE/UCT/Ichor] --> ETCH
+  SUB --> DEP
+classDef bottleneck fill:#ff6b6b,stroke:#000,stroke-width:3px,color:#fff
+```
+
+这张图揭示了一个关键事实：整条链的咽喉不在出货量最大的设备整机，而在喂给光刻机的三个上游分子级输入（光学、光刻胶、掩膜）与一个检测环节（KLA/Lasertec）。光刻机本身固然是 ASML 独家，但 ASML 也受制于上游，没有 Zeiss 的光学、没有日本的光刻胶、没有 Hoya 的掩膜、没有 Lasertec 的掩膜检测，再多 EUV 机台也无法良率量产。卡脖子是层层嵌套的，越往上游越窄。
+
+## 4.1 上中下游如何回应核心论断
+
+7 层产业链结构对 §1 的 4 个论断给出了清晰的产业级实证。论断 1（护城河 = 工艺 know-how 垄断）的最强证据在第二层与第三层：ASML 的 EUV、东京电子 88-90% 的涂胶显影、KLA 50%+ 的检测，份额本身只是结果，根因是竞争者即便买到同等机床也无法复制其工艺配方库，这在第七层得到反向印证，中国本土设备商（北方华创、中微）能在刻蚀/沉积达到 40%+ 国产化率，却在 EUV 光刻自给率为 0-1%，因为前者可逆向工程、后者是几十年 know-how 的物理墙。论断 2（利润迁移到后道）的载体在第四层与第五层：混合键合设备 ASP 从 50 万跳到 150-250 万美元、测试设备 2025 +48%，整条从封装到测试的传导链就是 AI 重塑后道价值的产业证据。论断 3（紫苏叶在材料/掩膜）的物质载体在第零层与第一层：Zeiss/日本三家/Hoya/Lasertec 这些市值远小于设备龙头的玩家，卡住了比设备整机更靠上游、更不可替代的环节。论断 4（中国是周期扰动）的证据贯穿第二层与第七层：中国本土设备商在中低端的快速渗透（35% 本土化）是真实的需求扰动，但在 EUV、高端检测、高端材料的全面缺位决定了它改变不了全球格局的顶层结构。
+
+| 论断 | 主要验证位置（产业链层级 + 玩家）| 次要验证 / 反驳信号 |
+|---|---|---|
+| 论断 1 know-how 垄断 | 第二/三层 ASML EUV、东京电子涂胶显影 88-90%、KLA 检测 50%+ | 反驳信号：中国刻蚀/沉积 40%+ 国产化（中低端可逆向）|
+| 论断 2 后道迁移 | 第四/五层 混合键合 ASP 3-5x、测试 +48%、NAND +45% | 待验证：HBM4 混合键合渗透节奏 |
+| 论断 3 紫苏叶材料/掩膜 | 第零/一层 Zeiss、日本三家光刻胶、Hoya/AGC 掩膜、Lasertec | 反驳：氖气可回收多源（使能层非真命门）|
+| 论断 4 中国周期扰动 | 第二/七层 35% 本土化集中中低端、EUV 自给 0-1% | 危险：2024 抢装透支压制 2025-26 成熟制程 |
+
+---
+
+# 五、价值链与利润池
+
+如果用一句话概括这个产业的利润分布，那就是：超额利润高度集中在"工艺壁垒最陡的少数环节"，而非出货量或收入规模最大的环节。设备整机商收入最大、品牌最响（ASML 单机 2 亿美元），但其利润率（净利率 25-30%）反而不如某些上游材料/光学环节；而真正卡住命脉的紫苏叶（Zeiss 光学、日本光刻胶、Hoya 掩膜）虽收入规模小，毛利率却可达 50-70%，定价权来自不可替代性。AI 的到来正在这个利润分布上叠加一个新的迁移方向，从前道逻辑制程向后道测试与封装迁移，这是过去两年最确定的结构性变化。
+
+## 5.1 价值传导 / 上下游利润流图
+
+下图把"半导体设备 1330 亿美元设备收入 + 700 亿材料收入 → 各 link 拆分 → 最终利润沉淀点"完整还原，展示钱如何从晶圆厂的资本开支流向各环节、又最终聚集在哪几个口袋。
+
+<!--VIZ:valueflow-->
+```
+┌────────────────────────────────────────────────────────────────────────────────┐
+│   ↓↓↓ 半导体材料与设备 2025 年资金流总览（晶圆厂资本开支驱动 · 设备 $133B 口径）↓↓↓│
+└────────────────────────────────────────────────────────────────────────────────┘
+
+  【资金源头 — 晶圆厂/IDM 资本开支】（台积电+三星+SK海力士+Intel+美光+中国 fabs）
+        ╲   +AI 算力资本开支（超大规模厂商 → 台积电 → CoWoS 扩产）
+         ╲   +中国大基金 RMB 5000 亿补贴 → 本土设备采购
+          ▼
+ ┌────────────────────────────────────────────────────────────────────┐
+ │  ① 核心前道设备  收入 ~$115.7B WFE / 净利率 25-30% ⭐⭐⭐⭐⭐          │ ◄── 收入最大
+ │     • ASML EUV 独家（净利率~30%）/ AMAT 广度 / Lam 刻蚀 / KLA 检测   │     利润池 #1
+ │     • 前五大占 56-66%，光刻是单极垄断                                │
+ └─────┬──────────────────────────────────────────────────────────────┘
+       │  设备采购占晶圆厂资本开支 ~70-80%
+       │  关键耗材并行采购：光刻胶/CMP/特种气体/掩膜
+       ▼
+ ┌────────────────────────────────────────────────────────────────────┐
+ │  ② 后道封装+测试设备  收入 ~$17B / 增速最快(test+48%) ⭐⭐⭐⭐⭐     │ ◄── 利润迁移点
+ │     • 混合键合 ASP 50万→150-250万美元（BESI/ASMPT）                 │     效率最高
+ │     • 测试 ATE 泰瑞达/Advantest，探针卡 FORM HBM 4x                  │
+ │     ⭐ 关键：占设备收入仅 13% 但 2025 增速 48%，是 AI 重定价的核心    │
+ └─────┬──────────────────────────────────────────────────────────────┘
+       │
+       ▼
+ ┌────────────────────────────────────────────────────────────────────┐
+ │  ③ 上游材料/耗材  收入 ~$70B / 毛利率 30-70% ⭐⭐⭐⭐               │
+ │     • EUV 光刻胶（日本~85%）/ CMP（Entegris/卡博特）/ 掩膜 blanks     │
+ │     • content-per-wafer 随节点微缩持续提升（结构性增量）             │
+ └─────────────────────────────────────────────────────────────────────┘
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+   平行流：与主链并行（喂给设备 OEM / 独立材料配套）
+
+ ┌────────────────────────────────────────────────────────────────────┐
+ │  ④ 关键子系统  ~$50B 市场 / 高 ROIC ⭐⭐⭐⭐                          │ ◄── 利润池 #2
+ │     • MKS（RF 电源#1）/ Advanced Energy / UCT / Ichor / 蔡司 / VAT   │
+ │     • 设备 OEM 高度依赖，但被中国本土价格挤压（China swing）         │
+ └─────────────────────────────────────────────────────────────────────┘
+
+ ┌────────────────────────────────────────────────────────────────────┐
+ │  ⑤ 紫苏叶层（光学/光刻胶/掩膜/掩膜检测）毛利 50-70% ⭐⭐⭐⭐⭐         │ ◄── 利润池 #3
+ │     • Zeiss SMT / 日本三家光刻胶 / Hoya+AGC 掩膜 / Lasertec 掩膜检测  │
+ │     • 市值小但不可替代，是整条链最深的护城河                         │
+ └─────────────────────────────────────────────────────────────────────┘
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ⭐⭐⭐⭐⭐ 钱最终沉淀在哪？利润池真正聚集的 4 个位置
+  ┌────────────────────────────────────────────────────────────────────┐
+  │  1) 前道设备寡头（ASML/AMAT/Lam/KLA）    净利率 25-30%   ⭐⭐⭐⭐⭐│
+  │  2) 后道 AI 设备（测试/混合键合）增速 48% 重定价中       ⭐⭐⭐⭐⭐│
+  │  3) 紫苏叶材料/掩膜/光学   毛利 50-70% 不可替代          ⭐⭐⭐⭐⭐│
+  │  4) 关键子系统（MKS/AE）   高 ROIC 但 China 价格扰动     ⭐⭐⭐⭐│
+  └────────────────────────────────────────────────────────────────────┘
+  其余收入分散在中低端设备、merchant 掩膜、硅片等周期性较强、利润率较薄的环节。
+```
+
+**价值传导图一句话解读**：半导体设备产业是「**晶圆厂资本开支 → 前道设备 $115.7B 厚利寡占 → 后道设备 $17B 高增速重定价 → 上游材料 $70B 耗材复购 + 平行的紫苏叶层 50-70% 毛利不可替代**」的多层利润传导结构。AI 资本开支正把增量集中导向第②层后道与第⑤层紫苏叶。理解这个产业的关键，是认识到收入规模与利润沉淀并不重合，最厚的利润落在工艺壁垒最陡、出货量未必最大的环节，这正是后续标的选择的逻辑起点。
+
+## 5.2 链节利润池详表
+
+更具体地看，整个产业的利润可以按链节拆解如下：
+
+| 链节 | 营收占比 | 利润占比 | 净利率 | 利润中心 |
+|---|---|---|---|---|
+| 前道核心设备 | ~57% | ~50% | 25-30% | ASML/AMAT/Lam/KLA |
+| 检测/过程控制 | ~8% | ~12% | 30-35% | KLA/Lasertec（高毛利）|
+| 后道封装设备 | ~5% | ~5% | 20-30% | BESI/ASMPT/K&S（增速最快）|
+| 测试设备 | ~8% | ~8% | 25-30% | 泰瑞达/Advantest/FORM |
+| 关键材料/耗材 | ~15% | ~18% | 高分散 30-70% | Entegris/日本材料商 |
+| 子系统/零部件 | ~7% | ~7% | 高 ROIC | MKS/AE/UCT/Ichor |
+
+这张表揭示了一个常被忽视的事实：检测与过程控制环节以约 8% 的营收占比贡献约 12% 的利润，净利率显著高于设备平均，KLA 的毛利率长期维持 60%+，因为良率检测是晶圆厂"省钱即赚钱"的刚需，定价权极强。这也解释了为何 KLA 在前五大设备商中市值/收入倍数最高。
+
+另一方面，从成本结构看，以一台 EUV 光刻机的物料拆解为例：光学系统（Zeiss）占成本约 25-30%、光源（Cymer，ASML 子公司）约 15%、精密机械与控制系统其余。
+
+整条产业链的 BOM 视角下，越往上游单环节价值越集中：
+
+| 环节 | 在 EUV 价值链占比 | 单价 / 关键数据 | 卡脖子等级 |
+|---|---|---|---|
+| EUV 光学（Zeiss）| ~25-30% | 全球独家供 ASML | ⭐⭐⭐⭐⭐ |
+| EUV 光源（Cymer）| ~15% | ASML 自有 | ⭐⭐⭐⭐ |
+| EUV 光刻胶 | 耗材/片 | 日本三家 ~85% | ⭐⭐⭐⭐⭐ |
+| EUV 掩膜 blanks | 耗材/掩膜 | Hoya/AGC ~100% | ⭐⭐⭐⭐⭐ |
+| EUV 掩膜检测 | 设备 | Lasertec actinic ~100% | ⭐⭐⭐⭐⭐ |
+
+未来 3 年，利润池将向两个方向迁移：向后道（测试 + 先进封装，AI 算力的物理必经之路），以及向更上游的紫苏叶层（节点微缩使光刻胶、掩膜、检测的工艺难度指数级上升，content-per-wafer 与单价同步抬升）。前道设备整机的利润占比将相对稳定但增速放缓，后道与材料的利润占比将结构性上升。这意味着配置重心应从"买最大的设备整机"向"买增速最快的后道 + 最不可替代的紫苏叶"倾斜。
+
+---
+
+# 六、关键 link 深度档案
+
+下面对 8 个 Tier 1 link 展开深度分析。每个 link 约 1000-1500 字，包含：是什么 + 命脉、谁在玩 + 谁卡在哪、1 级 vs 2 级估值错配、推荐动作与入场点。从最高优先级排到最低。
+
+---
+
+## 6.1 Link 1: 光刻设备（EUV 单极垄断）
+
+**速览**：整条链最硬的卡脖子 · 估值判断：1级 ASML 充分定价 / 2级 上游光学 Zeiss 未上市 · 推荐动作：核心持有 ASML，深挖上游 · 优先级 P1 · Top 标的 ASML
+
+**对应论断**：直接验证论断 1（护城河 = know-how 垄断）+ 间接验证论断 3（上游光学是紫苏叶）
+
+光刻是把电路图案转印到晶圆上的核心工序，决定了芯片能做到多小的线宽。极紫外光刻（EUV，波长 13.5nm）是 7nm 及以下先进节点的唯一量产路径，而 ASML 是全球唯一能造 EUV 光刻机的公司，这不是市场份额优势，是 100% 的独家垄断。一台标准 EUV 机售价超 2 亿美元，下一代 High-NA EUV 超 4 亿美元，单台价值量冠绝整条产业链。ASML 的垄断不是靠专利封锁，而是靠一个由数千家供应商构成的、耗时二十余年才组装起来的极端复杂系统：光源（每秒 5 万次的锡液滴被高功率激光击中产生 EUV）、光学（Zeiss 的纳米级反射镜，平整度误差相当于把德国国土铺平后起伏不超过 1 毫米）、以及双工件台的精密同步。竞争者即便拿到全套图纸也无法在十年内复制这套良率工艺。
+
+EUV 的发展史本身就是 know-how 壁垒的注脚。从 1990 年代立项到 2019 年台积电首次量产，ASML 烧掉数十年与数百亿研发，期间英特尔、三星、台积电以入股形式共担风险。这种"客户即股东"的绑定，使 ASML 在节点推进上始终领先一步。当前 EUV 处于成长中段，全球装机量 2025 年已超 100 台，预计到 2032 年翻倍，High-NA 刚开始小批量出货，渗透曲线远未饱和。
+
+谁在玩、谁卡在哪？光刻整机是 ASML 一家独大，DUV（深紫外，用于成熟节点）市场佳能与尼康仍有份额，但先进节点的 EUV 是 ASML 独占。真正的卡脖子在 ASML 的上游：Zeiss SMT 独家供应 EUV 光学（ASML 持有其股权），全球没有第二家能造同等精度反射镜；光源端的 Cymer 已被 ASML 收购。中国的光刻自给率在先进节点为 0-1%，上海微电子（SMEE）目前量产能力停留在 90nm 级别，与 ASML 存在代际差距，这是中国半导体最难逾越的物理墙。
+
+1 级 vs 2 级估值错配。ASML 当前市值约 6730 亿美元，P/S 约 20x、P/E 约 58x、EV/现金约 80x，作为全球最确定的科技垄断之一，其估值已被市场充分认知，不存在明显低估，属于"贵但合理"的核心资产。真正的错配在 2 级，ASML 的上游紫苏叶 Zeiss SMT 并未单独上市（隐藏在蔡司集团内），市场无法直接定价这个比 ASML 更上游、同样独家的环节；High-NA 时代光学难度进一步上升，Zeiss 的不可替代性只增不减。对二级市场投资者而言，ASML 是表达 EUV 主线的唯一可买标的，但需清醒认识到其增长弹性有限、估值已 price-in 垄断溢价。
+
+护城河与风险。ASML 的护城河是产业链级的，它锁定了从光学到光源的整个上游生态。主要风险有三：其一，对华出口管制使 ASML 损失中国先进节点市场（但中国成熟节点 DUV 需求仍在）；其二，下游晶圆厂资本开支周期波动直接传导至订单；其三，High-NA 量产进度若不及预期会延缓增长曲线。但这些都是周期性扰动，不动摇其结构性垄断。
+
+为方便事实速查，关键数据汇总如下：
+
+| 维度 | 数据 |
+|---|---|
+| 当前市场规模 | EUV 装机 >100 台，单机 >$2 亿 |
+| EUV 垄断度 | ASML 100% |
+| 地理 top 3 | 荷兰（整机）/ 德国（光学）/ 美国（光源）|
+| ASML 市值 | ~$6730 亿 |
+| 上游卡脖子 | Zeiss 光学（未上市）|
+| 供应链脆弱度 | 5/5（上游单点依赖）|
+
+> 🌿 **紫苏叶标注**：本 link 的金枪鱼是 ASML（人尽皆知的 EUV 垄断者），紫苏叶是 Zeiss SMT，EUV 反射镜光学，全球独家供 ASML，无第二家，属"买无可买"的设计/工艺 know-how 级命门。全部紫苏叶汇总见[附录 D](#附录-d紫苏叶清单金枪鱼-vs-紫苏叶)。
+
+**推荐动作与入场**。ASML 作为 EUV 主线唯一可买标的，建议核心配置但不追高，回调至 P/E 50x 以下分批建仓，3 年目标看 High-NA 放量 + 中国 DUV 恢复的双驱动。入场风险点是对华管制升级与资本开支周期下行。上游紫苏叶 Zeiss 无法直接买入，是本 link 最大的"看得到买不到"遗憾，可作为理解产业壁垒深度的认知锚。优先级 P1，但更多是配置型而非弹性型持有。
+
+---
+
+## 6.2 Link 2: 刻蚀与薄膜沉积
+
+**对应论断**：直接验证论断 1（刻蚀/沉积是 know-how 壁垒但可被中国部分逆向）+ 间接验证论断 4
+
+刻蚀（把不需要的材料蚀刻掉）与薄膜沉积（CVD/PVD/ALD，一层层把材料镀上去）是晶圆制造中工序数量最多、设备价值量第二大的环节，也是 3D NAND 堆叠层数竞赛与 GAA 晶体管的核心战场。当芯片从平面走向三维（3D NAND 已超 200 层、逻辑走向 GAA 环绕栅极），刻蚀与沉积的难度呈指数级上升，要在数百层堆叠中刻出垂直深孔、要在原子级精度上逐层沉积，这正是 Lam Research 与 AMAT 的护城河所在。这个环节是双寡头加挑战者格局：美国的 Lam（LRCX，刻蚀 + 沉积领先）与 AMAT（沉积广度第一），日本的东京电子（8035.T），加上中国的中微（688012，刻蚀）与北方华创（002371，沉积）。
+
+发展历史上，刻蚀与沉积长期是 Lam 与 AMAT 的核心利润来源，技术随 NAND 层数与逻辑节点持续迭代。当前处于 AI 驱动的上行中段：HBM 的 DRAM 电容、3D NAND 的层数跃升、GAA 与背面供电（backside power delivery）都在拉动这个环节的设备需求，2025 年 NAND 设备 +45%、DRAM 设备 +15% 直接受益于此。
+
+谁在玩、谁卡在哪？这是整条链里中国国产替代渗透最深的环节，刻蚀与沉积的国产化率已超 40%，中微的 5nm 刻蚀工具已进入台积电先进产线验证，北方华创的氧化扩散炉占 SMIC 28nm 产线 60%+。原因在于刻蚀/沉积的工艺虽难但可逆向工程、可通过大量试错追赶，不像 EUV 那样有不可逾越的物理墙。这也意味着这个环节的卡脖子等级（⭐⭐⭐⭐）低于光刻与检测，是中国"能打"的主战场。
+
+1 级 vs 2 级估值错配。Lam（LRCX）市值约 4020 亿美元、P/S 18.5x、P/E 61x、EV/现金 84x；AMAT 市值约 3876 亿、P/S 13.4x、P/E 46x。两者作为前道核心受益于 AI 上行，但 AMAT 的估值倍数明显低于 Lam 与 KLA，原因是其业务更广、成熟制程敞口更大、China swing 暴露更高。这构成一个相对错配：AMAT 是前五大里估值最便宜的，若市场过度担忧其成熟制程/中国敞口而忽视其 AI 沉积受益，则提供了相对价值。中国挑战者中微 P/E 91x、北方华创 P/E 76x，估值反映了国产替代的高预期，已不便宜。
+
+护城河与风险。Lam 与 AMAT 的护城河是工艺配方 + 客户绑定，但低于光刻，中国渗透是其长期份额的真实威胁。主要风险：中国国产替代在中低端持续侵蚀（已是现实而非假设）、成熟制程去库、对华出口管制反复。
+
+| 维度 | 数据 |
+|---|---|
+| 刻蚀/沉积国产化率 | >40%（中国境内）|
+| LRCX 市值 / P/S | ~$4020 亿 / 18.5x |
+| AMAT 市值 / P/S | ~$3876 亿 / 13.4x |
+| 卡脖子等级 | ⭐⭐⭐⭐（可被部分逆向）|
+
+**推荐动作与入场**。AMAT 作为前五大里相对便宜的标的（P/S 13.4x vs Lam 18.5x），适合作为前道配置的性价比选择，但需对其 China swing 保持警惕。Lam 是纯度更高的 AI 受益（HBM/NAND 弹性），但估值更贵。建议组合中以 AMAT 为底仓表达前道，回调建仓。中国标的中微/北方华创估值已高，仅作 watchlist 跟踪国产替代速度。优先级 P2。
+
+---
+
+## 6.3 Link 3: 量检测与过程控制
+
+**对应论断**：直接验证论断 1（检测是 know-how 垄断，毛利最高）+ 验证论断 3（EUV 掩膜检测 Lasertec 是紫苏叶）
+
+量检测与过程控制是半导体制造的"质检与导航系统"，在每一道工序后检查缺陷、测量关键尺寸、预测良率。这个环节看似不起眼，却是整条链毛利率最高（KLA 毛利 60%+）、定价权最强的隐形利润中心，因为"良率即利润"，晶圆厂愿意为能提早发现缺陷的工具支付高溢价。环节由美国的 KLA（KLAC，检测/量测综合龙头 50%+）主导，加上专精计量的 Onto（ONTO）、以色列的 Nova（NVMI），以及先进封装 AOI 检测的 Camtek（CAMT，以色列）。但本环节最深的卡脖子不在 KLA，而在 EUV 掩膜检测的 Lasertec（6920.T，日本），它是全球唯一能做 actinic（用真实 EUV 波长）掩膜检测的公司，近乎 100% 独家。
+
+发展历史上，KLA 通过数十年并购与自研构建了从图形检测到量测的全套产品线，机器学习的引入进一步拉大了它与追赶者的差距。当前处于 AI 上行受益期：节点微缩使缺陷检测难度上升、先进封装引入全新的检测需求（Camtek、Onto 的先进封装计量直接受益于 CoWoS/HBM），整个环节随 AI 资本开支水涨船高。
+
+谁在玩、谁卡在哪？KLA 在前道检测/量测的综合地位无人撼动，是这个环节的金枪鱼。但真正不可替代的紫苏叶是 Lasertec，EUV 掩膜在使用前必须用真实 EUV 波长检测缺陷，而 Lasertec 是唯一掌握 actinic 检测技术的公司，台积电、三星、Intel 的 EUV 量产都离不开它。这是一个市值约 2.2 万亿日元（约 220 亿美元）、却卡住全球先进制程命脉的隐形垄断。中国在高端检测的自给率极低，是仅次于 EUV 光刻的第二道难墙。
+
+1 级 vs 2 级估值错配。KLA（KLAC）市值约 2719 亿美元、P/S 20.8x、P/E 59x、EV/现金 55x，是前五大里估值倍数最高的之一，反映了市场对其高毛利垄断的认可，属"贵得有理"。错配在 2 级与子环节：Onto（ONTO）P/E 高达 125x、Camtek（CAMT）P/E 179x，先进封装检测的高增长预期已被打得很满，估值偏贵需警惕；Nova（NVMI）P/S 18x 同样不便宜。紫苏叶 Lasertec 的 EV/现金 42.8x、P/E 40x，对一个 100% 独家、受益 EUV 装机翻倍的标的而言，估值并非离谱，是本 link 里"不可替代性 vs 估值"性价比相对合理的隐形冠军。
+
+护城河与风险。KLA 与 Lasertec 的护城河都是工艺 know-how + 数据积累，极难复制。风险：先进封装检测子环节（Onto/Camtek）估值过高，若 AI 资本开支不及预期则面临戴维斯双杀；Lasertec 单一产品依赖 EUV，若 EUV 装机增速放缓则承压。
+
+| 维度 | 数据 |
+|---|---|
+| KLA 检测/量测份额 | ~50%+ |
+| KLA 毛利率 | 60%+（全链最高之一）|
+| Lasertec EUV 掩膜检测 | ~100% 独家 |
+| ONTO/CAMT P/E | 125x / 179x（偏贵）|
+| Lasertec 市值 | ~$220 亿 |
+
+> 🌿 **紫苏叶标注**：本 link 金枪鱼是 KLA（检测综合龙头），紫苏叶是 Lasertec（6920.T），EUV 掩膜 actinic 检测全球独家，市值远小于其卡住的产业价值，是真设备级命门（与买不到的材料类紫苏叶不同，Lasertec 是可买的隐形冠军）。详见[附录 D](#附录-d紫苏叶清单金枪鱼-vs-紫苏叶)。
+
+**推荐动作与入场**。KLA 是前道里质量最高的标的（毛利最高、垄断最稳），建议核心配置，回调建仓。Lasertec 作为可买的 EUV 掩膜检测独家垄断者，是本研究重点推荐的隐形冠军，估值相对其不可替代性合理，建议配置。规避 Onto、Camtek 这类已被打满的高 P/E 先进封装检测标的，除非大幅回调。优先级 P1。
+
+---
+
+## 6.4 Link 4: 先进封装与混合键合（AI 后道核心）
+
+**对应论断**：直接验证论断 2（利润迁移到后道，混合键合 ASP 3-5x 抬升）
+
+先进封装是 AI 算力时代后道价值重估的震中。当前道微缩逼近物理极限，把多颗芯片在封装层面拼接（chiplet 异质集成）成为延续算力增长的主路径，台积电的 CoWoS、HBM 的 3D 堆叠都属此列。其中混合键合（Cu-Cu 直接铜对铜键合）是技术皇冠：它用无凸点的直接键合替代传统的微凸点，实现更高密度、更短互连，是 HBM4 16 层堆叠突破 TSV 良率瓶颈的关键路径。这个环节是 AI 物理瓶颈最集中的地方，CoWoS 月产能从 1.3 万片狂奔向 10-12 万片仍供不应求。
+
+发展历史上，后道封装长期是低附加值的"组装环节"，利润薄、技术含量低。AI 彻底改变了这一点：混合键合设备单价从传统倒装芯片键合机的约 50 万美元跳升到 150-250 万美元，ASP 抬升 3-5 倍，意味着即便出货台数温和增长，设备商收入也能跳升。这是过去两年最确定的结构性变化，整个环节从成熟期被 AI 拽回成长期。
+
+谁在玩、谁卡在哪？混合键合龙头是荷兰的 BESI（BE Semiconductor，未在美股主上市），其设备已通过台积电、日月光及多家 HBM 客户验证，AMAT 在 2025 年 4 月买入 9% 股权成为最大股东，这是前道巨头对后道方向的最强背书。第二梯队是 ASMPT（2018.HK，新加坡/香港上市），正在量产第二代混合键合设备并向 HBM 客户交付。引线键合与热压键合（TCB）端是 Kulicke & Soffa（KLIC）。减薄切割环节则由日本的 Disco（6146.T，近垄断）主导。BESI 因其混合键合龙头地位甚至传出被收购传闻。
+
+1 级 vs 2 级估值错配。这是本研究最看好的错配所在。ASMPT（2018.HK）市值约 514 亿港元（约 66 亿美元），P/S 仅 1.6x、P/E 17.9x、EV/现金 6.2x，作为混合键合明确的二供、直接受益 HBM4 量产的标的，这个估值显著低于其 AI 弹性应有的水平，是被低估的后道 alpha。对比之下，BESI 估值更高（龙头溢价 + 收购预期），ASMPT 提供了更好的风险收益比。Kulicke & Soffa（KLIC）市值约 53 亿美元、P/E 98.5x，估值已不便宜，需等待 TCB 订单兑现。Disco（6146.T）P/S 16.8x、EV/现金 24.7x，作为减薄切割近垄断者估值合理偏贵。
+
+护城河与风险。混合键合的护城河是设备精度（亚微米对准）+ 客户验证周期（一旦进入量产配方极难替换）。风险：HBM4 混合键合的实际渗透节奏存在不确定性（部分厂商可能延续 TCB）、AI 资本开支若回落则后道承压、ASMPT 的混合键合份额能否从 BESI 手中扩大尚待验证。
+
+| 维度 | 数据 |
+|---|---|
+| 混合键合 ASP | $150-250 万（vs 倒装 $50 万）|
+| CoWoS 月产能 2026E | 10-12 万片 |
+| BESI 最大股东 | AMAT（持 9%）|
+| ASMPT 市值 / P/E | ~$66 亿 / 17.9x（低估）|
+| KLIC 市值 / P/E | ~$53 亿 / 98.5x |
+
+> 🌿 **紫苏叶标注**：本 link 的隐形瓶颈在混合键合的精密对准运动平台与键合头，BESI/ASMPT 的核心 know-how 不可外购；但这两家本身已是市场关注标的，非市值微小的隐形 gem。真正的封装层紫苏叶在更上游的临时键合胶/载板（如味之素 ABF film），见[附录 D](#附录-d紫苏叶清单金枪鱼-vs-紫苏叶)。
+
+**推荐动作与入场**。ASMPT（2018.HK）是本研究最高确信度的后道 alpha，混合键合二供、估值 P/E 17.9x 严重低估、直接受益 HBM4，建议重点配置。BESI 是龙头但估值已含收购预期，可作为补充。KLIC 等 TCB 订单兑现后再考虑。这个 link 是论断 2 最直接的表达，优先级 P1。
+
+---
+
+## 6.5 Link 5: 测试设备（ATE + 探针卡 + 老化）
+
+**对应论断**：直接验证论断 2（测试 2025 +48%，AI 重定价最快环节）
+
+测试是芯片出厂前的最后一道关，也是 2025 年增速最快的环节，测试设备销售暴增 48.1% 至 112 亿美元，背后是 AI 芯片测试复杂度的爆炸式上升。一颗集成了 HBM 的 AI 训练芯片，测试项目数、测试时间、并行通道数都远超传统芯片，且因单颗价值极高（一颗 GPU + HBM 封装价值数万美元），任何漏检都意味着巨额损失，这把测试从"成本中心"推成了"价值守门人"。环节分三块：ATE 自动测试设备（系统级/SoC 测试 + 内存测试）、探针卡（晶圆级测试的接触界面）、晶圆级老化筛选。
+
+发展历史上，ATE 长期是泰瑞达（TER）与 Advantest（6857.T）的双寡头，Cohu（COHU）做分选/接触补充。AI 把这个成熟双寡头重新激活：Advantest 凭借在内存/HBM 测试与高速 DRAM 测试的领先，被称为"测试界的 ASML"，2025 年随 HBM 量产业绩弹性巨大；泰瑞达在 SoC 与系统级测试（SLT）领先，随 chiplet 异质集成把 SLT 从利基推向主流。
+
+谁在玩、谁卡在哪？ATE 端，Advantest（~31%）+ 泰瑞达（~30%）合计约六成，Advantest 在内存/HBM 测试更强、泰瑞达在 SoC 更强，是各有侧重的双寡头。探针卡端，FormFactor（FORM）+ Technoprobe（意大利）+ 旺矽合计约 60%，但格局正在向 Technoprobe 倾斜，它凭借一体化 MEMS 探针制造拿下台积电 2nm 验证的 30%，侵蚀 FORM 的历史领先；FORM 的 HBM 探针卡 2024 年增长 4 倍是其亮点。晶圆级老化端，Aehr（AEHR）是唯一同时提供晶圆级与封装级老化的公司，独家覆盖 SiC/GaN/光子/AI 处理器，正从 SiC（EV 需求崩塌）向 AI 老化转型。
+
+1 级 vs 2 级估值错配。泰瑞达（TER）市值约 588 亿美元、P/S 15.5x、P/E 70x、EV/现金 238x（现金少），作为 ATE 双寡头之一直接受益 AI 测试上行，估值合理偏贵。Advantest（6857.T）P/S 16.2x、P/E 49x，HBM 测试纯度最高、弹性最大，是本环节最强受益。错配的两端：探针卡的 FORM（P/E 141x）估值已高且面临 Technoprobe 份额侵蚀，需谨慎；最危险的是 Aehr（AEHR），市值约 31 亿美元但 P/S 高达 68x、EV/现金 83x，而其 FY25 收入仅 5900 万、FY26 一季度跌到 1100 万的低谷，估值完全 price-in 了 AI 老化的未来故事，是典型的动量打满、风险极高的标的。
+
+护城河与风险。ATE 双寡头的护城河是测试程序生态 + 客户绑定；探针卡是 MEMS 工艺精度。风险：FORM 面临 Technoprobe 的份额侵蚀（已是现实）；AEHR 的 AI 转型尚未兑现到报表，估值与基本面严重背离；中国本土测试机以 30% 折扣抢占了本土 25% 份额，构成中低端价格压力。
+
+| 维度 | 数据 |
+|---|---|
+| 测试设备 2025 增速 | +48.1%（全链最快）|
+| ATE 双寡头 | Advantest 31% + 泰瑞达 30% |
+| 探针卡 | FORM+Technoprobe+旺矽 ~60% |
+| AEHR 估值 | P/S 68x（动量打满·风险高）|
+| FORM HBM 探针卡 | 2024 增长 4x |
+
+**推荐动作与入场**。Advantest（6857.T）是测试环节 AI 纯度最高的标的，建议配置以表达论断 2；泰瑞达作为 SoC/SLT 受益补充。规避 AEHR（P/S 68x 与 5900 万收入严重背离，等待 AI 订单真正兑现到报表再议）。FORM 因份额侵蚀谨慎，仅在大幅回调时考虑。优先级 P1（Advantest/泰瑞达）/ 规避（AEHR）。
+
+---
+
+## 6.6 Link 6: 关键材料（光刻胶 / CMP / 特种气体 / 掩膜）
+
+**对应论断**：直接验证论断 3（真紫苏叶在材料端，日本垄断 EUV 光刻胶/掩膜）
+
+材料是这条产业链最隐形、却最不可替代的一层。与设备的"一次性资本品"不同，材料是随每片晶圆持续消耗的耗材，content-per-wafer 随节点微缩持续提升，是结构性增量。这一层的卡脖子集中度甚至超过设备：EUV 光刻胶被日本三家（JSR、东京应化、信越）垄断约 85%、整体光刻胶日本占约 80%；EUV 掩膜 blanks 被 Hoya（7741.T）与 AGC 双寡头垄断近 100%；CMP 浆料由 Entegris（ENTG）与卡博特领先；特种气体则相对分散。这层是论断 3 的主战场，最贵的不一定最不可或缺，真正断供则全厂停产的紫苏叶在材料端。
+
+发展历史上，日本在半导体材料的统治地位可追溯到 1980 年代的产业政策与化学工业积累，几十年的配方迭代构筑了分子级的工艺壁垒。这种壁垒在 2019 年日韩贸易摩擦中暴露无遗，日本一度限制对韩国出口光刻胶等三种材料，直接威胁三星的生产，凸显了材料垄断的地缘杠杆。当前处于 AI 上行受益期，先进逻辑与 HBM 拉动高端材料需求，Fujifilm 在 2025 年 6 月为台积电增产 EUV 光刻胶 30%。
+
+谁在玩、谁卡在哪？可买的综合材料标的是 Entegris（ENTG），它横跨 CMP 浆料/垫、CVD/ALD 前驱体、离子注入特种气体（Materials Solutions），以及过滤/纯化（Advanced Purity Solutions），是少数可在美股直接投资的材料平台，content-per-wafer 随先进节点提升。但真正的紫苏叶，EUV 光刻胶与掩膜 blanks，掌握在日本手里：JSR 已被日本产业革新投资机构（JIC）私有化退市，东京应化（4186.T）、信越（4063.T）是 EUV 光刻胶可追踪标的；掩膜 blanks 的 Hoya（7741.T）与 AGC 是双寡头。中国在高端材料（EUV 光刻胶、高纯前驱体）的自给率极低，是与 EUV 光刻、高端检测并列的第三道难墙。
+
+1 级 vs 2 级估值错配。这是本 link 最值得关注的地方。Entegris（ENTG）市值约 203 亿美元、P/S 6.3x、EV/现金 53x，作为可买的综合材料平台，其 P/S 显著低于设备龙头（KLA 20.8x、Lam 18.5x），反映材料商的耗材生意属性（增速稳但弹性低于设备），是相对低估的"卖水人中的卖水人"。更深的错配在日本紫苏叶，信越（4063.T）P/S 仅 5.0x、EV/现金 6.8x、P/E 27x，作为同时垄断硅片、合成石英、EUV 光刻胶的材料巨头，估值便宜得惊人，是被市场用"日本传统化工股"逻辑而非"半导体卡脖子"逻辑定价的典型错配；Hoya（7741.T）P/S 8.9x、P/E 34x，作为 EUV 掩膜 blanks 双寡头之一同样不贵。这层是"不可替代性远超估值"的紫苏叶富矿。
+
+护城河与风险。材料的护城河是分子级配方 + 客户量产验证（一旦进入某节点配方极难替换），是整条链最深的护城河之一。风险：材料商增速低于设备（耗材属性）、Entegris 受 fab 活动整体节奏影响、日本标的有汇率与"传统化工"估值压制。
+
+| 维度 | 数据 |
+|---|---|
+| EUV 光刻胶日本份额 | ~85%（JSR/TOK/信越）|
+| EUV 掩膜 blanks | Hoya+AGC ~100% |
+| Entegris 市值 / P/S | ~$203 亿 / 6.3x |
+| 信越 P/S / EV现金 | 5.0x / 6.8x（低估）|
+| 中国高端材料自给 | 极低（第三道墙）|
+
+> 🌿 **紫苏叶标注**：本 link 是紫苏叶最密集的环节，EUV 光刻胶（日本三家 ~85%，分子级配方买不到）、EUV 掩膜 blanks（Hoya/AGC ~100%，Mo/Si 40-50 层多层膜 know-how）、合成石英（信越/Heraeus）。其中信越是"一家垄断硅片+石英+光刻胶却被当传统化工股定价"的最大错配。详见[附录 D](#附录-d紫苏叶清单金枪鱼-vs-紫苏叶)。
+
+**推荐动作与入场**。Entegris（ENTG）是可买的综合材料平台，P/S 6.3x 相对设备龙头低估，建议配置作为"材料卖水人"敞口。信越（4063.T）是本研究力荐的紫苏叶，硅片+石英+EUV 光刻胶三重垄断却 P/S 仅 5.0x，是被严重错误定价的材料巨头，建议配置（需接受日股流动性与汇率）。Hoya（7741.T）作为掩膜 blanks 双寡头补充。优先级 P1。
+
+---
+
+## 6.7 Link 7: 关键子系统与零部件
+
+**对应论断**：间接验证论断 1（子系统是设备 OEM 的隐形依赖）+ 验证论断 4（China 价格扰动）
+
+子系统是设备产业链里"超级明星却不为人知"的一层，ASML、AMAT、Lam 这些整机巨头高度依赖一批专精的子系统供应商，后者提供真空、射频电源、气体/流体输送、热控等关键模块。这是一个约 500 亿美元的年市场，前十大包括蔡司、MKS、Edwards、Horiba、Advanced Energy、VAT、Ultra Clean、Ichor 等。这些公司的共同点是：在某个细分子系统拥有领先份额、被设备 OEM 深度绑定、却因不直接面向终端而缺乏公众认知。
+
+发展历史上，子系统市场随设备周期波动，2023 年因下游去库下滑 7.5%，2025 年随 WFE 复苏而反弹。当前处于复苏期，EUV High-NA、GAA、背面供电、混合键合都在抬高对超稳定电源、精密流量/真空控制的要求，结构性提升子系统的价值量与技术门槛。
+
+谁在玩、谁卡在哪？可买的美股标的有四个：MKS（MKSI，射频电源全球第一 + 真空 + 气体控制 + 光子学综合）、Advanced Energy（AEIS，等离子体电源，与 MKS/COMET 竞争）、Ultra Clean（UCTT，气体输送集成模块）、Ichor（ICHR，流体输送模块，以集成方案挤压传统供应商）。卡脖子等级中等（⭐⭐⭐），这层的技术壁垒不如材料/光刻，且正面临中国本土子系统与化学品供应商的激进价格竞争，是 China swing 暴露较高的一层。
+
+1 级 vs 2 级估值错配。MKS（MKSI）市值约 214 亿美元、P/S 5.3x、P/E 66x、EV/现金 44x，作为子系统综合龙头（射频电源第一）受益设备复苏与 NAND 升级周期，估值中性。Advanced Energy（AEIS）P/S 6.6x、P/E 65x，与 MKS 类似。错配在更下游的集成模块商，Ultra Clean（UCTT）P/S 仅 1.9x、Ichor（ICHR）P/S 2.5x，这两家因业务偏组装、毛利薄、China 价格压力大而被给予极低估值倍数。它们是高弹性低估值的设备周期 beta 标的：上行周期里收入弹性大，但毛利薄、护城河浅，是"便宜但脆弱"的典型，便宜本身不构成买入理由，需结合周期位置判断。
+
+护城河与风险。MKS/AE 的护城河是技术广度 + OEM 绑定，UCT/Ichor 的护城河较浅（组装属性）。风险：中国本土子系统供应商的激进价格竞争（已是现实）、OEM 供应商整合压力、对华敞口与合规成本上升。
+
+| 维度 | 数据 |
+|---|---|
+| 子系统市场规模 | ~$500 亿/年 |
+| MKS 市值 / P/S | ~$214 亿 / 5.3x（RF#1）|
+| UCTT / ICHR P/S | 1.9x / 2.5x（便宜但脆弱）|
+| 卡脖子等级 | ⭐⭐⭐（China 价格压力大）|
+
+**推荐动作与入场**。MKS（MKSI）是子系统里质量最高的标的（射频电源第一、技术广度），适合作为设备复苏的配置。UCTT/ICHR 是高弹性的周期 beta，仅适合在周期上行明确时博弹性，不宜长持（毛利薄、China 压力）。整体优先级 P2-P3，属于设备 beta 而非结构性 alpha。
+
+---
+
+## 6.8 Link 8: 离子注入与特种制程利基
+
+**对应论断**：间接验证论断 2（特种制程受益 AI/硅光）+ 论断 4
+
+这个 link 汇集了截图 universe 中几个定位独特的利基玩家，离子注入与退火（Axcelis ACLS + Veeco VECO，2025 年宣布合并）、特种代工（Tower TSEM）、测量仪器横切（Keysight KEYS）、实验室自动化（Azenta AZTA）、merchant 光掩膜（Photronics PLAB）。它们各自卡住一个细分环节，受益于不同的 AI 衍生需求。
+
+最值得关注的事件是 Axcelis 与 Veeco 的合并。Axcelis（ACLS）是离子注入设备商，2025 年 9 月推出 Purion Power Series+ 专攻 SiC 功率器件；Veeco（VECO）做 MOCVD、激光退火、离子束沉积、先进封装光刻。合并后将成为美国第四大 WFE 供应商，可寻址市场超 50 亿美元，产品线横跨离子注入、激光退火、离子束沉积、先进封装、MOCVD，更深地暴露于 AI 与功率半导体两条主线。这是 universe 中唯一的大型整合事件，重塑了中型设备商格局。
+
+Tower（TSEM）是另一条独特主线。作为特种代工厂（SiGe/BiCMOS/硅光/SOI/RFCMOS/CIS/功率 BCD），它是硅光（SiPho）与 SiGe 用于光通信的全球第一。AI 数据中心的光互联爆发直接拉动其硅光业务：2025 年硅光收入从约 1.06 亿翻倍到 2.28 亿美元，硅光+SiGe 合计从 2.41 亿涨到 4.21 亿（占总收入约 30%），并签下 2027 年 13 亿美元硅光合同，这是 AI 光互联在特种代工端的直接变现。
+
+谁在玩、谁卡在哪？这些利基环节各有壁垒：离子注入是 AMAT/Axcelis 双强、SiC 注入是 Axcelis 的新增长点；特种代工 Tower 在 SiGe/硅光独家领先（竞争对手 GlobalFoundries、UMC 等）；Keysight 在电子设计与测试仪器横切；Photronics 是 merchant 光掩膜（独立于晶圆厂自产掩膜）。卡脖子等级中等，但各自的细分壁垒清晰。
+
+1 级 vs 2 级估值错配。这层估值分化极大。Tower（TSEM）市值约 292 亿美元、P/S 18x、P/E 114x，硅光故事已被充分定价甚至打满，13 亿美元 2027 合同的预期已反映在股价，需警惕高估值。Axcelis（ACLS）市值约 48 亿、P/S 5.7x、P/E 49x、EV/现金 12x，作为合并后第四大 WFE + SiC 功率受益，估值相对合理偏便宜，是这层里性价比较好的。Photronics（PLAB）P/S 仅 2.1x、P/E 11x、EV/现金 1.8x，估值极低，作为 merchant 光掩膜虽增速平淡但便宜得不像 AI 产业链标的，是深度价值候选。Keysight（KEYS）P/S 9.3x、P/E 53x 中性。Azenta（AZTA）P/S 1.8x、EV/现金 1.9x，业务偏生命科学样本管理，半导体敞口有限，估值低但成长性弱。
+
+护城河与风险。这层护城河参差，Tower 硅光壁垒高但估值贵、Axcelis 离子注入壁垒中等、Photronics 掩膜壁垒中等。风险：Tower 硅光高估值若 AI 光互联不及预期则双杀、合并整合执行风险（ACLS+VECO）、利基环节规模小波动大。
+
+| 维度 | 数据 |
+|---|---|
+| ACLS+VECO 合并后 | 美国第四大 WFE，TAM >$50 亿 |
+| Tower 硅光收入 | $1.06 亿→$2.28 亿（翻倍）|
+| Tower 2027 硅光合同 | $13 亿 |
+| ACLS 市值 / P/S | ~$48 亿 / 5.7x（合理）|
+| PLAB 估值 | P/E 11x / EV现金 1.8x（深度价值）|
+
+**推荐动作与入场**。Axcelis（ACLS）是这层性价比最好的标的，合并后第四大 WFE + SiC 受益、P/S 5.7x 合理，建议配置。Photronics（PLAB）作为深度价值候选（P/E 11x），适合价值型投资者博估值修复。Tower（TSEM）硅光逻辑强但估值已打满，仅在回调时考虑。Keysight/Azenta 中性，非重点。优先级 P2-P3。
+
+---
+
+# 七、地缘与政策约束
+
+半导体设备与材料是全球地缘博弈最激烈的产业，没有之一。它的国别集中度极高且呈"卡位互锁"结构，美国控设备广度与 EDA、荷兰控 EUV 光刻、日本控材料与涂胶显影、中国掌握最大单一市场却卡在高端，任何一环的政策变动都会沿链条传导。当前的核心政策变量是美国对华出口管制与中国的国产替代反制，两者构成这个产业最大的非市场风险。
+
+数据显示，美国自 2022 年 10 月起持续收紧对华先进半导体设备出口，2024 年 12 月进一步把特定前驱体加入实体清单，切断中国 14nm 及以下产线的部分供应。这一管制的悖论性后果是加速了中国的国产替代，正如一位前北方华创员工所言，2023 年管制前 SMIC 等本土晶圆厂偏好美国设备、不给本土厂机会，管制后"别无选择只能与本土供应商合作"。结果是中国境内设备国产化率从 2024 年的 25% 跃升至 2025 年的 35%，超过 30% 的目标，其中刻蚀与沉积已超 40%。
+
+国别矩阵分三视图呈现：上方是 ASCII 世界分布图，中间是精对齐 markdown 矩阵，下方是海外节点延伸表。
+
+## 7.1 ASCII 世界分布图（按 link × 国家分组）
+
+<!--VIZ:geo-->
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│            🌍 半导体材料与设备 6 国 × 多 link 世界分布速览（2026Q2）                │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+  美国 — 设备广度 + 检测 + 测试 + 子系统
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │ 沉积/刻蚀:AMAT/Lam ⭐⭐⭐⭐ | 检测:KLA ⭐⭐⭐⭐⭐ | 测试:泰瑞达       │
+  │ 探针卡:FormFactor | 子系统:MKS/AE/UCT/Ichor | 材料:Entegris | 注入:Axcelis│
+  └──────────────────────────────────────────────────────────────────────┘
+
+  荷兰 — EUV 光刻独家
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │ 光刻:ASML ⭐⭐⭐⭐⭐(EUV 100%) | 混合键合:BESI ⭐⭐⭐⭐⭐              │
+  └──────────────────────────────────────────────────────────────────────┘
+
+  日本 — 材料 + 涂胶显影 + 掩膜 + 减薄（最深护城河）
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │ 涂胶显影:东京电子 ●(88-90%) | 光刻胶:JSR/TOK/信越 ⭐⭐⭐⭐⭐(85%)      │
+  │ 掩膜blanks:Hoya ⭐⭐⭐⭐⭐ | 掩膜检测:Lasertec ⭐⭐⭐⭐⭐ | 减薄:Disco │
+  │ 硅片/石英:信越/SUMCO | 测试:Advantest ●(31%·HBM)                       │
+  └──────────────────────────────────────────────────────────────────────┘
+
+  韩国 — 客户 + 部分材料突破
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │ 客户:三星/SK海力士(HBM) | 光刻胶:东进Semichem(进入三星 3nm EUV)        │
+  └──────────────────────────────────────────────────────────────────────┘
+
+  欧洲 — 光学 + 子系统 + 探针卡
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │ EUV光学:Zeiss ⭐⭐⭐⭐⭐(德·独家) | 真空阀:VAT ●瑞 | 探针卡:Technoprobe●意│
+  │ 气体:Air Liquide ●法(氖气18%)                                          │
+  └──────────────────────────────────────────────────────────────────────┘
+
+  中国 — 最大市场 + 中低端国产替代（卡在高端）
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │ 刻蚀:中微 ▲(5nm验证) | 沉积:北方华创 ▲ | 清洗:盛美 ▲ | EUV:0-1% ❌     │
+  │ 本土化率35%(刻蚀/沉积>40%) | 大基金 RMB5000亿 | 50%本土采购令           │
+  └──────────────────────────────────────────────────────────────────────┘
+```
+
+## 7.2 完整国别 × link 精对齐 markdown 矩阵
+
+| 链节 \ 国别 | 美国 | 日本 | 中国 | 韩国 | 欧洲 | 其他 |
+|---|---|---|---|---|---|---|
+| 光刻 | — | 佳能/尼康(DUV) | SMEE(90nm·0-1%) | — | ASML(荷·EUV 100%)⭐ | — |
+| EUV光学 | — | — | — | — | Zeiss(德·独家)⭐ | — |
+| 刻蚀/沉积 | AMAT/Lam(主导) | 东京电子 | 中微/北方华创(40%+) | — | — | — |
+| 检测/量测 | KLA(50%+)⭐ | Lasertec(掩膜100%)⭐ | 低自给 | — | — | Nova/Camtek(以) |
+| 涂胶显影 | — | 东京电子(88-90%)⭐ | 芯源微 | — | — | — |
+| 光刻胶 | 杜邦 | JSR/TOK/信越(85%)⭐ | 南大光电(低) | 东进 | — | — |
+| 掩膜blanks | — | Hoya/信越⭐ | 低 | — | AGC | — |
+| 先进封装键合 | AMAT(持BESI) | Disco(减薄) | — | — | BESI(荷)/ASMPT⭐ | ASMPT(港) |
+| 测试ATE | 泰瑞达(30%) | Advantest(31%)⭐ | 华峰/长川(中低端) | — | — | — |
+| 探针卡 | FormFactor | 旺矽/MJC | — | — | Technoprobe(意) | 旺矽(台) |
+| 子系统 | MKS/AE/UCT/Ichor | Ebara/Horiba | 本土追赶 | — | VAT/Zeiss | — |
+
+## 7.3 海外节点延伸表（产业全球化前哨）
+
+| 国家/地区 | 关键节点 | 代表玩家 | 战略意义 |
+|---|---|---|---|
+| 台湾 | 最大设备消费地 + 探针卡 | 台积电(客户)/旺矽 | 先进制程资本开支龙头，CoWoS 扩产中心 |
+| 以色列 | 计量/检测人才 | Nova(NVMI)/Camtek(CAMT) | 先进封装 AOI 与计量的隐形强国 |
+| 新加坡 | 后道封装设备 | ASMPT | 混合键合二供基地 |
+| 马来西亚/菲律宾 | OSAT + 探针卡产能 | FormFactor 菲律宾厂 | 分散地缘风险的产能转移前哨 |
+| 美国（CHIPS）| 本土 fab 回流 | Intel/台积电亚利桑那/美光 | CHIPS 法案补贴拉动本土设备需求 |
+
+矩阵与延伸表之外，还有几个节点不能忽视：氖气供应在俄乌冲突后从乌克兰单点依赖转向美国本土回收（Air Products 在德州/亚利桑那的回收厂可供约 40% 美国需求），是 EUV 用气供应链韧性的关键改善；韩国东进 Semichem 在 2025 年首次向三星 3nm EUV 供应光刻胶，是日本光刻胶垄断出现的第一道裂缝。
+
+地缘风险评分见下表：
+
+| Link | top 国占比 | 风险等级 | 卡在哪个国家 |
+|---|---|---|---|
+| EUV 光刻 | 荷兰 100% | ⭐⭐⭐⭐⭐ | 荷兰(整机)/德国(光学)|
+| EUV 光刻胶 | 日本 85% | ⭐⭐⭐⭐⭐ | 日本 |
+| EUV 掩膜/检测 | 日本 ~100% | ⭐⭐⭐⭐⭐ | 日本(Hoya/Lasertec)|
+| 涂胶显影 | 日本 88-90% | ⭐⭐⭐⭐ | 日本(东京电子)|
+| 检测/量测 | 美国 50%+ | ⭐⭐⭐⭐ | 美国(KLA)|
+
+最后是 stress-test 情景的影响评估：
+
+| 情景 | 影响最大的 link | 影响幅度 | 替代时间 | 概率（3yr）|
+|---|---|---|---|---|
+| 对华管制全面升级 | 中国本土设备/材料 | 中国厂加速替代/美日厂失中国收入 | 5-10 年 | 高 |
+| 日本限制材料出口 | EUV 光刻胶/掩膜 | 全球先进制程停摆 | 无短期替代 | 低 |
+| 中国成熟制程去库 | 刻蚀/沉积/子系统 | 相关设备收入回落 | 1-2 年 | 高 |
+| 台海冲突 | 全产业(台积电中断) | 灾难性 | 无 | 低 |
+| AI 资本开支退潮 | 后道测试/封装 | 增速最快环节回落 | 1-2 年 | 中 |
+
+地缘格局的底层逻辑是：高端环节（EUV 光刻、光刻胶、掩膜、检测）的卡脖子互锁让美日荷形成了对中国先进制程的联合封锁，而中国的反制是在中低端疯狂国产替代 + 用最大市场地位反向施压。这个格局决定了全球设备龙头的中国收入将长期承压且波动，但其在高端的结构性垄断难以被撼动，这正是论断 4 的核心：中国是周期扰动，不是格局颠覆者。
+
+---
+
+# 八、投资标的与组合建议
+
+基于前七章的产业链分析与 link 深度档案，本研究的核心投资组合如下。组合遵循全球均衡原则，既配置美股设备寡头，也纳入被"传统化工/日股"逻辑错误定价的日本紫苏叶，以及被低估的后道 alpha。
+
+| 仓位类型 | 仓位 % | 标的 | Ticker | 国别 | thesis 一句话 |
+|---|---|---|---|---|---|
+| 重仓 | 9% | ASMPT | 2018.HK | ● 港 | 混合键合二供·P/E 17.9x 严重低估·论断 2 |
+| 重仓 | 8% | KLA | KLAC | ◆ 美 | 检测垄断·毛利 60%+·论断 1 |
+| 重仓 | 7% | 信越化学 | 4063.T | ● 日 | 硅片+石英+EUV光刻胶三垄断·P/S 5.0x·论断 3 |
+| 配置 | 6% | Advantest | 6857.T | ● 日 | HBM 测试"测试界 ASML"·论断 2 |
+| 配置 | 6% | ASML | ASML | ● 荷 | EUV 唯一可买·核心资产·论断 1 |
+| 配置 | 5% | Entegris | ENTG | ◆ 美 | 可买材料平台·P/S 6.3x 相对低估·论断 3 |
+| 配置 | 5% | Lasertec | 6920.T | ● 日 | EUV 掩膜检测独家·可买隐形冠军·论断 1/3 |
+| 配置 | 4% | Axcelis | ACLS | ◆ 美 | 合并第四大WFE+SiC·P/S 5.7x·论断 2 |
+| 配置 | 4% | AMAT | AMAT | ◆ 美 | 前道最便宜·P/S 13.4x·论断 1 |
+| 价值 | 3% | Photronics | PLAB | ◆ 美 | merchant 掩膜·P/E 11x 深度价值 |
+| 对冲/规避 | — | AEHR/CAMT | AEHR/CAMT | ◆ 美 | P/S 68x/P/E 179x 动量打满·规避 |
+| 现金 | 37% | — | — | — | 等待 China 去库出清 + 回调建仓 |
+
+组合国别分布为美国 ◆ 5 席、日本/欧洲/港 ● 5 席、中国 ▲ 0 席——高端命门 universe 天然以美日欧为主，中国标的（中微 ▲、北方华创 ▲）因估值过高（P/E 76-91x）且敞口集中中低端，仅入 Watchlist 跟踪。非中国占比 100%，符合全球性产业的均衡覆盖原则；这一分布本身就是论断 4 的侧证——真正不可替代的环节几乎不在中国手里。
+
+合计 57% 仓位，37% 现金，含对若干打满动量标的的规避。组合刻意保留高现金，因周期处于中段而非底部、中国去库扰动未出清。
+
+## 8.1 定量估值速查表
+
+下表把 universe 全部标的的估值锚定到可比指标（市值、EV/现金、P·S、P·E 均为真调，价格截至 2026-06 前后）。**注意跨币种不可直接相加**：美股市值单位为 $B，日股为十亿日元（¥B），港/台/韩为各自本币，下表市值列已标币种，无量纲比率（EV/现金、P·S、P·E）可跨市场比较。
+
+| Ticker | 国别 | 市值 | EV/现金 | P·S | P·E | 评级 | 一句话 |
+|---|---|---|---|---|---|---|---|
+| ASML | ● 荷 | $673B | 79.7 | 20.0 | 58.1 | 增持 | EUV 唯一可买·贵但合理 |
+| AMAT | ◆ 美 | $388B | 46.9 | 13.4 | 45.8 | 增持 | 前道最便宜·China swing |
+| LRCX | ◆ 美 | $402B | 84.4 | 18.5 | 60.9 | 中性 | 刻蚀龙头·估值偏贵 |
+| KLAC | ◆ 美 | $272B | 55.1 | 20.8 | 59.0 | 买入 | 检测垄断·毛利最高 |
+| ENTG | ◆ 美 | $20.3B | 53.4 | 6.3 | 77.2 | 买入 | 材料平台·相对低估 |
+| MKSI | ◆ 美 | $21.4B | 44.2 | 5.3 | 66.5 | 中性 | 子系统 RF#1 |
+| TER | ◆ 美 | $58.8B | 238.9 | 15.5 | 69.6 | 增持 | ATE 双寡头·SoC |
+| ONTO | ◆ 美 | $13.4B | 19.5 | 13.0 | 125.4 | 中性 | 封装计量·偏贵 |
+| ACLS | ◆ 美 | $4.8B | 12.3 | 5.7 | 48.5 | 买入 | 合并第四大·SiC·合理 |
+| COHU | ◆ 美 | $2.52B | 4.8 | 5.2 | — | 中性 | 分选·周期 beta |
+| NVMI | ● 以 | $16.5B | 14.7 | 18.2 | 64.9 | 中性 | 计量·以色列 |
+| VECO | ◆ 美 | $3.65B | 9.2 | 5.6 | 157.3 | 中性 | 并入 ACLS·MOCVD |
+| FORM | ◆ 美 | $9.67B | 31.0 | 11.5 | 140.9 | 减持 | 探针卡·份额被侵蚀 |
+| AEIS | ◆ 美 | $12.5B | 17.8 | 6.6 | 65.1 | 中性 | 等离子电源 |
+| KLIC | ◆ 美 | $5.31B | 10.0 | 6.9 | 98.5 | 中性 | TCB 键合·待兑现 |
+| CAMT | ● 以 | $7.98B | 11.6 | 16.0 | 178.7 | 减持 | 封装 AOI·P/E 179x 打满 |
+| UCTT | ◆ 美 | $3.89B | 13.4 | 1.9 | — | 中性 | 输送模块·便宜脆弱 |
+| ICHR | ◆ 美 | $2.35B | 27.2 | 2.5 | — | 中性 | 流体模块·便宜脆弱 |
+| PLAB | ◆ 美 | $1.81B | 1.8 | 2.1 | 11.3 | 增持 | merchant 掩膜·深度价值 |
+| TSEM | ● 以 | $29.2B | 18.6 | 18.0 | 113.6 | 减持 | 硅光·已打满 |
+| KEYS | ◆ 美 | $56.4B | 23.5 | 9.3 | 53.3 | 中性 | T&M·横切 |
+| AEHR | ◆ 美 | $3.1B | 83.2 | 68.5 | — | 回避 | WLBI·P/S 68x 极度背离 |
+| AZTA | ◆ 美 | $1.06B | 1.9 | 1.8 | — | 中性 | 样本管理·半导体敞口弱 |
+| 信越 4063.T | ● 日 | ¥12743B | 6.8 | 5.0 | 27.1 | 买入 | 三重垄断·最大错配 |
+| Hoya 7741.T | ● 日 | ¥8457B | 13.8 | 8.9 | 34.0 | 增持 | 掩膜 blanks 双寡头 |
+| Lasertec 6920.T | ● 日 | ¥3505B | 42.8 | 13.9 | 40.5 | 增持 | 掩膜检测独家 |
+| 东京电子 8035.T | ● 日 | ¥25134B | 48.6 | 10.3 | 44.1 | 增持 | 涂胶显影 88-90% |
+| Advantest 6857.T | ● 日 | ¥18305B | 52.9 | 16.2 | 49.1 | 买入 | HBM 测试纯度最高 |
+| Disco 6146.T | ● 日 | ¥7319B | 24.7 | 16.8 | 54.1 | 增持 | 减薄/切割近垄断 |
+| ASMPT 2018.HK | ● 港 | HK$51.4B | 6.2 | 1.6 | 17.9 | 买入 | 混合键合二供·最低估 |
+| ACMR | ▲ 中 | $5.63B | 3.7 | 5.9 | 62.2 | 中性 | 中国清洗·便宜 |
+| 北方华创 002371 | ▲ 中 | ¥424.6B | 23.4 | 10.2 | 75.9 | 中性 | 国产替代·预期已高 |
+| 中微 688012 | ▲ 中 | ¥248.7B | 28.2 | 18.9 | 91.5 | 中性 | 刻蚀·预期已高 |
+
+把"估值错配"落成数字后，几个判断清晰浮现。其一，最便宜的不可替代标的是信越（4063.T，P/S 5.0x、EV/现金 6.8x），同时垄断硅片、合成石英、EUV 光刻胶却被当传统化工股，是全表最大错配。其二，最低估的 AI 弹性标的是 ASMPT（P/E 17.9x、EV/现金 6.2x），混合键合二供却估值是 KLIC（P/E 98.5x）的五分之一。其三，最危险的是 AEHR（P/S 68.5x、EV/现金 83x）与 Camtek（P/E 179x），估值与基本面（AEHR 收入仅 5900 万、一季度跌到 1100 万）严重背离，是典型的动量打满。其四，深度价值候选是 Photronics（P/E 11x、EV/现金 1.8x），便宜得不像 AI 产业链标的，适合价值修复博弈。
+
+**重仓 1 深度论述**。ASMPT（2018.HK）是本研究最高确信度的标的。逻辑链条清晰：AI 算力的物理瓶颈在后道封装（CoWoS 供不应求），HBM4 16 层堆叠需要混合键合突破 TSV 良率，混合键合设备 ASP 是传统键合机的 3-5 倍（150-250 万 vs 50 万美元）。ASMPT 是仅次于 BESI 的明确二供，正在量产第二代混合键合设备并向 HBM 客户交付。而它的估值，P/E 17.9x、P/S 1.6x、EV/现金 6.2x，只有龙头 BESI 与同行 KLIC（P/E 98.5x）的一个零头，反映了市场对其混合键合份额能否扩大的怀疑，以及香港上市标的的折价。这种"明确受益方向 + 极低估值"的组合正是错配 alpha 的定义。风险是混合键合渗透节奏与份额竞争，但即便保守假设，当前估值已提供了厚实的安全边际。
+
+**重仓 2 深度论述**。信越化学（4063.T）是本研究力荐的紫苏叶。它的独特之处在于一家公司同时卡住三个分子级命门：全球最大的半导体硅片供应商、EUV 用合成石英的核心供应商、以及 EUV 光刻胶日本三强之一。任何一个单拎出来都是不可替代的卡脖子环节，三者叠加在一家公司身上，护城河深不见底。然而它的估值，P/S 仅 5.0x、EV/现金 6.8x、P/E 27x，是全表所有紫苏叶里最便宜的，原因是市场用"日本传统化工股"的低增长逻辑而非"半导体卡脖子"的垄断逻辑给它定价。这是典型的认知错配：当一家公司的产品断供会让全球先进制程停摆，它理应享有比普通化工股高得多的估值。催化剂是 EUV 装机翻倍带动的光刻胶与石英需求、以及 AI 拉动的硅片高端化。
+
+**对冲 / 规避标的论述**。本研究明确规避两类标的。第一类是估值与基本面严重背离的动量股，AEHR（P/S 68.5x，收入仅 5900 万且一季度跌到 1100 万低谷）把 AI 老化的未来故事完全 price-in，一旦订单兑现不及预期面临戴维斯双杀；Camtek（P/E 179x）、Tower（P/E 114x）、FormFactor（P/E 141x）同属高估值且各有隐忧（FORM 份额被 Technoprobe 侵蚀）。第二类是高 China swing + 薄毛利的脆弱标的，UCTT/ICHR 虽便宜（P/S <2.5x）但护城河浅、受中国本土价格挤压，仅适合周期博弈不宜长持。规避不等于做空，而是不在当前位置配置。
+
+**Watchlist 持续关注**：
+
+| Ticker | 名 | 国 | 关注理由 | 转重仓触发 |
+|---|---|---|---|---|
+| BESI | BE Semiconductor | 荷 | 混合键合龙头·AMAT 持 9% | 估值回调 + 收购落定 |
+| 8035.T | 东京电子 | 日 | 涂胶显影 88-90% 近垄断 | 日元/估值回调 |
+| 7741.T | Hoya | 日 | EUV 掩膜 blanks 双寡头 | EUV 装机加速确认 |
+| LRCX | Lam Research | 美 | 刻蚀龙头·AI 受益 | 回调至 P/S 15x 以下 |
+| ACMR | ACM Research | 美 | 中国清洗·EV/现金 3.7x 便宜 | 中国去库出清 |
+
+---
+
+# 九、风险、证伪与月度跟踪
+
+任何投资 thesis 都需要清晰的 kill condition。本研究四大论断的 kill condition 如下：
+
+| Thesis | Kill 触发 | 概率（3yr）| 应对动作 |
+|---|---|---|---|
+| 论断 1 know-how 垄断 | 中国 EUV 自给率突破 5%+ 或本土检测进入先进产线 | 低 | 重估全球设备龙头护城河 |
+| 论断 2 后道迁移 | 测试/封装设备增速回落至个位数 | 中 | 减后道 alpha（ASMPT/Advantest）|
+| 论断 3 材料紫苏叶 | 韩国/中国光刻胶大规模替代日本 | 低-中 | 减信越/Hoya 配置 |
+| 论断 4 中国周期扰动 | 中国国产替代冲击全球龙头高端份额 | 低 | 重估格局，但短期不改 |
+
+需要强调的是，最值得警惕的是论断 2 的 kill，AI 资本开支若退潮，后道增速会最先回落，因为后道是 AI 弹性最高也最脆弱的环节。当前 AI 算力需求有真实 token 消耗支撑，但超大规模厂商资本开支的可持续性是 2026-27 的核心变量。一旦台积电下调 CoWoS 扩产或超大规模厂商削减 AI 资本开支，ASMPT、Advantest 这类高弹性后道标的将首当其冲。
+
+**全链 worst case**。最坏情景是 AI 资本开支退潮 + 中国成熟制程去库 + 台海地缘升级三重叠加。前两者是周期性的，会压制 2026-27 设备收入但不改长期结构；台海冲突则是灾难性的尾部风险（台积电产能中断将瘫痪全球先进制程），无法对冲也无法替代，只能以仓位控制应对。组合保留 37% 现金正是对这种不确定性的应对，在周期中段而非底部、地缘风险高企时，不满仓本身就是风险管理。
+
+**月度跟踪 KPI**。下面是必须每月监控的 Top 10 KPI：台积电月度资本开支指引 / CoWoS 月产能爬坡 / HBM4 混合键合渗透率 / SEMI 月度设备出货（北美 + 日本）/ 中国设备国产化率（季度）/ 测试设备订单（泰瑞达/Advantest）/ EUV 月度装机 / memory 现货价（DRAM/NAND）/ 中国大基金采购动向 / 美国对华管制更新。
+
+**Catalyst 日历**：
+
+| 时间 | Catalyst | 影响 link | 推测影响 |
+|---|---|---|---|
+| 2026 各季 | 台积电资本开支指引 | 前道全链 | 上调=前道继续扩 |
+| 2026H2 | HBM4 量产爬坡 | 后道键合/测试 | ASMPT/Advantest 弹性 |
+| 持续 | 美国对华管制更新 | 中国设备/材料 | 加速国产替代 |
+| 季度 | CSIA 国产化率数据 | 中国标的 + 全球龙头 China 收入 | 验证论断 4 |
+| 持续 | ACLS+VECO 合并完成 | 离子注入/MOCVD | 重塑中型 WFE 格局 |
+
+**警报阈值**：测试设备增速跌破 +15%（论断 2 预警）/ 中国 EUV 自给率突破 5%（论断 1 预警）/ 韩国光刻胶份额突破 20%（论断 3 预警）/ AI 超大规模厂商资本开支同比转负（全链预警）。任一触发立即重审对应 thesis。
+
+---
+
+# 十、邻接产业与历史类比
+
+半导体材料与设备处于科技产业链的最上游，与多个高价值赛道强相关。理解这些邻接关系，既能发现跨产业 alpha，也能借历史周期校准当前判断。
+
+**强邻接产业（Top 3）**：
+
+第一是先进封装与 CoWoS（强度 ⭐⭐⭐⭐⭐）。这是本研究后道环节的直接延伸，AI 算力的物理瓶颈集中于此，混合键合、TCB、硅中介层是核心技术。本研究的 ASMPT、KLIC、BESI 都深度暴露于此。建议跟进研究：`/industry "先进封装"`。
+
+第二是 HBM 高带宽内存（强度 ⭐⭐⭐⭐⭐）。HBM 是 AI 训练芯片的标配，其 16 层堆叠驱动了混合键合、晶圆级测试、探针卡的全部增量需求。三星、SK 海力士、美光的 HBM 资本开支直接传导至设备商。建议跟进研究：`/industry "HBM"`。
+
+第三是硅光与光互联（强度 ⭐⭐⭐⭐）。AI 数据中心的光互联爆发拉动了 Tower 的硅光业务、以及 AEHR 的光子老化测试。硅光是 AI 算力 scale-out 的关键路径。建议跟进研究：`/industry "硅光 CPO"`。
+
+**历史类比**。理解当前周期需要两个历史参照。
+
+第一个类比是 2017-18 的存储设备周期。当年 memory 资本开支在 2017 爆发后于 2018 见顶断崖，设备商经历了一轮剧烈的戴维斯双杀。当前与之的关键区别在于需求性质，2018 是存储投机性扩产，本轮是 AI 算力的真实物理需求，持续性更强；但相似之处是周期中段的乐观情绪容易掩盖见顶信号，因此对台积电资本开支指引、memory 现货价的跟踪至关重要。
+
+与此同时，第二个历史参照是 2019 年日韩贸易摩擦。当年日本限制对韩出口光刻胶等三种材料，直接威胁三星生产，暴露了材料垄断的地缘杀伤力。这一事件是论断 3（材料紫苏叶）最生动的历史注脚，它证明了材料断供能在数周内瘫痪一国的半导体产业，而设备即便被卡，库存还能撑数月。材料的不可替代性在时间维度上甚至超过设备。
+
+**跨产业 alpha 标的**：某些公司同时受益于本产业 + 多个邻接，未充分 price-in 多重叙事：
+
+| 标的 | 本产业叙事 | 邻接叙事 | 合并 thesis |
+|---|---|---|---|
+| Tower TSEM | 特种代工设备客户 | 硅光/光互联 + RF | 双叙事但已打满 |
+| Advantest | 测试设备 | HBM 测试 | AI 测试纯度最高 |
+| ASMPT | 后道键合设备 | 先进封装 + HBM | 双受益且低估 |
+| Entegris | 材料平台 | 先进封装材料 + HBM | content-per-wafer 提升 |
+
+**本研究 gap 与下次 update trigger**：本研究对私有/未单独上市的紫苏叶（Zeiss SMT 光学、JSR 私有化后）只能定性描述无法定价，是认知 gap；下次更新触发为台积电 2026 资本开支指引落定、HBM4 混合键合渗透率明确、或中国国产替代出现高端突破。
+
+---
+
+# 十一、结论与下一步
+
+回到 §1 提出的 4 个核心论断，经过 §4-§10 的产业链全方位检验，本研究的整体判断如下：半导体材料与设备是一个成熟期叠加 AI 第二增长曲线的寡占产业，超额利润高度集中在工艺壁垒最陡的少数环节，而 AI 正把增量结构性地导向后道（测试/封装）与上游紫苏叶（材料/掩膜）。当前周期处于复苏中段而非底部，分化剧烈，AI 纯度高的环节上行，成熟制程与中国抢装敞口承压。配置的核心逻辑不是"买最大的设备整机"，而是"买增速最快的后道 + 最不可替代且最便宜的紫苏叶"。
+
+## 11.1 核心论断验证情况
+
+| 论断 | 验证状态 | 关键证据 | 更新看法 |
+|---|---|---|---|
+| 论断 1 know-how 垄断 | ✅ 已确认 | EUV 100%/涂胶显影 88-90%/检测 50%+/中国 EUV 0-1% | 护城河源于 know-how 不可采购，份额是结果 |
+| 论断 2 后道迁移 | ✅ 已确认 | 测试 +48%/混合键合 ASP 3-5x/AMAT 买 BESI | 最确定的增量，但也最脆弱（依赖 AI capex）|
+| 论断 3 材料紫苏叶 | ✅ 已确认 | 日本光刻胶 85%/Hoya 掩膜/信越三垄断却 P/S 5x | 材料不可替代性 + 估值错配双重确认 |
+| 论断 4 中国周期扰动 | ⚠️ 部分确认 | 35% 本土化集中中低端/EUV 卡死，但 2024 抢装透支 | 短期 demand swing 真实，长期格局未变 |
+
+四个论断中，论断 1、2、3 被产业链强力验证，论断 4 部分确认。最值得加仓的是论断 2 的后道迁移与论断 3 的材料紫苏叶，前者是最确定的现金流增量（ASMPT/Advantest），后者是最深护城河 + 最大估值错配（信越/Lasertec）。最需警惕的是论断 2 的脆弱性：后道弹性最高也最依赖 AI 资本开支的持续性，一旦超大规模厂商削减 capex 将首当其冲。论断 4 提醒我们，中国去库的 demand swing 是 2025-26 压制成熟制程设备商的真实风险，但它改变不了高端格局，这正是产业研究的价值：把"中国替代要颠覆全球"的市场叙事，在产业链上还原为"中低端真替代、高端真卡死"的分层真相。
+
+**Top 3 立即行动**：
+
+第一，建立 ASMPT（2018.HK）核心仓位，混合键合二供、P/E 17.9x 严重低估、直接受益 HBM4，是论断 2 风险收益比最好的表达。
+
+第二，配置信越（4063.T）+ Lasertec（6920.T）这两个被低估的紫苏叶，前者硅片+石英+光刻胶三垄断却 P/S 5x，后者 EUV 掩膜检测独家，是论断 3/1 最深护城河的可买敞口。
+
+第三，规避动量打满标的（AEHR P/S 68x、Camtek P/E 179x、Tower P/E 114x），保留高现金等待中国去库出清与回调建仓。
+
+**Top 3 M3 深研入口**：
+
+第一优先 ASMPT（2018.HK），混合键合份额竞争与 HBM4 渗透节奏是其弹性的核心变量，需深研其设备验证进度与客户结构。
+
+第二优先 信越化学（4063.T），三重垄断的护城河深度与"传统化工估值"修复的催化剂时点值得个股级深研。
+
+第三优先 Advantest（6857.T），HBM 测试的份额与 ASP 弹性，是测试环节 AI 纯度最高的标的。
+
+**给基金老板 / 投委会 30 秒电梯版**：
+
+> 半导体设备是 AI 算力的卖铲人，2025 年最刺眼的不是前道（WFE +11%）而是后道（测试 +48%），利润池正从光刻机房迁向封测车间。最高确信度是 ASMPT（混合键合二供、P/E 17.9x 是同行五分之一），最深护城河是被当传统化工股的信越（硅片+石英+光刻胶三垄断却 P/S 5x），最该规避的是 AEHR（P/S 68x 配 5900 万收入）。方向确定、路径颠簸，保留高现金等中国去库出清后加仓。
+
+---
+
+# 附录 A：跨 link 对比矩阵
+
+## A.1 定价充分度矩阵
+
+| Link | 1级估值 | 2级估值 | thesis | 错配方向 | 时间窗口 | 推荐动作 |
+|---|---|---|---|---|---|---|
+| 光刻 | ASML 充分 | Zeiss 未上市 | EUV 垄断 | 无错配 | 长期 | 核心持有 |
+| 刻蚀沉积 | Lam 偏贵 | AMAT 相对便宜 | AI 沉积 | AMAT 低估 | 中期 | 配置 AMAT |
+| 检测 | KLA 合理 | Lasertec 合理 | 高毛利垄断 | Onto/Camtek 高估 | 中期 | 买 KLA/Lasertec |
+| 先进封装 | BESI 含溢价 | ASMPT 低估 | 混合键合 | ASMPT 严重低估 | 近期 | 重仓 ASMPT |
+| 测试 | Advantest 合理 | AEHR 极度高估 | AI 测试 | AEHR 背离 | 近期 | 买 Advantest 避 AEHR |
+| 材料 | Entegris 相对低估 | 信越 严重低估 | 材料紫苏叶 | 信越 最大错配 | 中期 | 重仓信越 |
+| 子系统 | MKS 中性 | UCTT 便宜脆弱 | 设备 beta | 无清晰错配 | 周期 | 周期博弈 |
+| 利基 | Tower 高估 | Axcelis 合理 PLAB 低估 | 特种制程 | PLAB 深度价值 | 中期 | 配 ACLS/PLAB |
+
+## A.2 生命周期 vs 卡脖子矩阵
+
+<!--VIZ:lifecycle-->
+```
+                       卡脖子: 极强(命门)    强        中        弱
+生命周期: Embryonic    硅光老化(AEHR)       —         —         —
+         Growth        混合键合/HBM测试     AI检测     SiC注入    —
+         Maturity      EUV光刻/光刻胶/掩膜  刻蚀沉积   子系统     merchant掩膜
+         Decline       —                   —         成熟制程   —
+         Renewal       掩膜检测(Lasertec)   先进封装   —         —
+```
+
+## A.3 1级 vs 2级估值 ASCII 气泡图
+
+<!--VIZ:bubble-->
+```
+估值/关注度 ↑
+高 │ AEHR🔴      CAMT🔴 TSEM🔴            ASML●
+   │ FORM🔴             KLAC●  Lasertec○
+   │            ONTO         Advantest○
+中 │      ACLS◆        Entegris◆
+   │   PLAB◆      信越🌿(便宜却三垄断)
+低 │        ASMPT🌿(低估却命门)  Hoya🌿
+   └──────────────────────────────────────→
+     低关注                      不可或缺度(命门)→高
+   🌿=紫苏叶错配区(右下:便宜却命门=机会) 🔴=动量打满 ◆=价值 ●=核心
+```
+
+## A.4 ESG / 客户 / 脆弱度 Heatmap
+
+| Link | 客户集中度 | 供应链脆弱度 | 政策风险 | 综合 |
+|---|---|---|---|---|
+| 光刻 | 高(少数 fab) | 5/5(上游单点) | 5/5(管制) | 极高 |
+| 材料 | 中 | 4/5(日本集中) | 5/5(出口) | 高 |
+| 检测 | 高 | 3/5 | 4/5 | 高 |
+| 后道 | 中(HBM 客户) | 3/5 | 3/5 | 中 |
+| 子系统 | 高(OEM) | 3/5 | 3/5(China) | 中 |
+
+## A.5 投资优先级总排序
+
+| Rank | Link | 核心理由 | 推荐动作 | 表达标的 |
+|---|---|---|---|---|
+| 1 | 先进封装 | 后道 alpha 低估 | 重仓 | ASMPT |
+| 2 | 材料 | 最深护城河 + 最大错配 | 重仓 | 信越/Entegris |
+| 3 | 检测 | 高毛利垄断 | 配置 | KLA/Lasertec |
+| 4 | 测试 | AI 纯度最高 | 配置 | Advantest |
+| 5 | 光刻 | 垄断但充分定价 | 核心持有 | ASML |
+| 6 | 刻蚀沉积 | 相对性价比 | 配置 | AMAT |
+| 7 | 利基 | 个别价值机会 | 选配 | ACLS/PLAB |
+| 8 | 子系统 | 周期 beta | 博弈 | MKS |
+
+---
+
+# 附录 B：完整 KPI 速查表
+
+按 link 分组的月度跟踪 KPI：**光刻**，EUV 月度装机、High-NA 出货、ASML 订单；**刻蚀沉积**，NAND 设备订单、中国国产化率、Lam/AMAT 指引；**检测**，KLA 订单、先进封装检测需求、Lasertec EUV 掩膜订单；**后道**，CoWoS 月产能、HBM4 混合键合渗透、ASMPT/BESI 订单；**测试**，测试设备增速、泰瑞达/Advantest 订单、HBM 探针卡需求；**材料**，光刻胶产能扩张、信越/Hoya 财报、content-per-wafer 趋势；**子系统**，MKS/AE 指引、China 价格压力；**地缘**，美国管制更新、CSIA 国产化率、大基金采购。
+
+---
+
+# 附录 C：信息源与方法论
+
+## C.1 数据源
+
+**行业研究**：SEMI 年终设备预测（2025-12）、CSIA 国产化率数据、Yole 子系统市场监测、TechInsights 先进封装展望、各市场研究机构（交叉参考）。
+**财务数据**：yfinance（全球三层真调，37 标的）、SEC EDGAR、各公司财报。
+**新闻**：TrendForce、各公司公告、行业 Substack 分析。
+**政策**：美国商务部出口管制、CSIS/CSET 分析、中国大基金动向。
+
+## C.2 方法论
+
+本研究使用「行业研究方法论 V2.11.6」生成，机构卖方研报口吻 + manifesto-driven 论断贯通 + 紫苏叶发现引擎。完整方法论见 `~/.claude/skills/industry-research/SKILL.md`。
+
+## C.3 配套数据
+
+机器可读结构化数据：`半导体材料与设备_data.json` — 含全部标的真调估值、charts、KPI、stress test 等结构化字段。
+
+## C.4 下次更新
+
+- 季度自动（每 3 月）
+- 事件触发：台积电 2026 资本开支指引落定 / HBM4 混合键合渗透率明确 / 中国国产替代高端突破 / ACLS+VECO 合并完成
+
+---
+
+# 附录 D：紫苏叶清单（金枪鱼 vs 紫苏叶）
+
+> 方法论来源：Serenity「紫苏叶理论」，最昂贵 ≠ 最不可或缺。紫苏叶 = 市值微小、流动性稀薄、却在特定环节拥有绝对技术垄断的隐形瓶颈。本节区分 chokepoint 类型：设计/工艺 know-how（不可采购，真命门）> 专用件 > 通用件 > 大宗材料/标准设备（可采购，使能层）。
+
+| 链节 | 金枪鱼（明星）| 🌿 紫苏叶（隐形瓶颈）| chokepoint 论证 | 红队：若被替代靠什么 | 等级 / 类型 |
+|---|---|---|---|---|---|
+| EUV 光学 | ASML（EUV 整机）| Zeiss SMT（德·未上市）| EUV 反射镜纳米级平整度，全球独家供 ASML，几十年光学 know-how 买不到 | 无第二家能造同精度反射镜，物理墙极硬 | ⭐⭐⭐⭐⭐ 设计/工艺 know-how（不可采购）|
+| EUV 光刻胶 | ASML（光刻机）| JSR(私有)/东京应化 4186.T/信越 4063.T（日·~85%）| 分子级化学放大配方，几十年迭代，2019 日韩摩擦证明断供瘫痪三星 | 韩国东进刚进三星 3nm（第一道裂缝），但短期无法大规模替代 | ⭐⭐⭐⭐⭐ 配方 know-how（不可采购）|
+| EUV 掩膜 blanks | 掩膜厂 | Hoya 7741.T + AGC（日·~100%）| Mo/Si 40-50 层多层膜 + Ru 封盖 + 近零缺陷，离子束沉积 know-how | 仅 Hoya/AGC 商用产能，AMAT 有潜力但未入场 | ⭐⭐⭐⭐⭐ 多层膜工艺（不可采购）|
+| EUV 掩膜检测 | KLA（检测）| Lasertec 6920.T（日·~100%）| actinic（真实 EUV 波长）掩膜缺陷检测全球独家 | 无第二家做 actinic 检测，KLA 用 e-beam 但非真波长 | ⭐⭐⭐⭐⭐ 设备 know-how（可买的隐形冠军）|
+| 涂胶显影 | 东京电子整机 | 东京电子 8035.T（日·88-90%）| 涂胶显影与 EUV 光刻的工艺协同绑定，近垄断 | 中国芯源微追赶中低端，高端无替代 | ⭐⭐⭐⭐ 专用件/工艺（部分可买）|
+| 先进封装载板 | BESI/ASMPT 键合机 | 味之素 ABF film（日·Ajinomoto·~95%）| AI 芯片载板绝缘膜，做味精的公司垄断分子级材料 | 无替代材料能达同等绝缘/平整度 | ⭐⭐⭐⭐⭐ 材料配方（不可采购）|
+| EUV 用氖气 | ASML | Air Liquide（法·18%）| EUV 等离子体用高纯氖，EUV 比 DUV 多耗 3-5 倍 | 可回收 + 多源（美国回收厂供 40% 需求）= 使能层非真命门 | ⭐⭐⭐ 大宗材料（可采购·使能层）|
+
+**紫苏叶清单一句话结论**：半导体设备链最深的护城河不在出货量最大的设备整机（金枪鱼），而在喂给光刻机的分子级输入，EUV 光学、光刻胶、掩膜 blanks、掩膜检测、ABF 载板。这些紫苏叶中，可直接买入的只有 Lasertec（6920.T，掩膜检测独家）、Hoya（7741.T，掩膜 blanks）、信越（4063.T，光刻胶+硅片+石英三垄断）；Zeiss、JSR、味之素 ABF 部分隐藏在大集团或私有化主体内难以纯粹表达。氖气类可采购材料属使能层而非真命门（红队：可回收多源），含金量低于设计/工艺 know-how 类。建议深挖方向：`/industry "ABF 载板"` 钻到味之素分子级命门。
+
+---
+
+*生成时间：2026-06-08*
+*方法论版本：行业研究方法论 V2.11.6（单文件研报版）*
+*配套数据：`半导体材料与设备_data.json`*
+*下次更新：台积电 2026 资本开支指引落定 / HBM4 渗透率明确*
+</script>
+<script id="charts" type="application/json">{"masthead": {"kicker": "BCA 产业研究 · Semiconductor Materials & Equipment · 2026Q2", "standfirst": "2025 最刺眼的不是前道 WFE +11%，是后道测试 +48%——利润池正从光刻机房迁向封测车间", "meta": ["<span><b>口径<\/b> 全球 · 3 年视角 · 设备 $1330B + 材料 $700B<\/span>", "<span><b>覆盖<\/b> 23 标的截图 universe + 海外命门 + 中国本土<\/span>", "<span><b>真调<\/b> yfinance 37 标的 · 截至 2026-06<\/span>"]}, "dashboard": {"tam": {"cap": "全球设备市场（自下而上）· 2025E（单位 $B）", "subcap": "后道测试 +48% 增速碾压前道 WFE +11%，是 AI 重定价的震中", "source": "SEMI 年终设备预测 2025-12", "asof": "2025-12", "unit": "B", "categories": ["前道WFE-逻辑", "前道WFE-DRAM", "前道WFE-NAND", "测试设备", "封装设备"], "values": [66.6, 22.5, 14.0, 11.2, 18.4], "colors": ["#8c2f23", "#a8512f", "#c47a3a", "#d4a017", "#6b6b6b"]}, "scatter": {"cap": "市值 × 命门纯度（紫苏叶散点）", "subcap": "右下=便宜却命门=机会区（信越/ASMPT/Hoya）", "expLabels": ["", "极小", "中", "高", "纯(不可买)"], "points": [{"name": "ASML", "mcap": 673, "exposure": 4, "buy": 1}, {"name": "KLAC", "mcap": 272, "exposure": 4, "buy": 1}, {"name": "信越", "mcap": 82, "exposure": 4, "buy": 1}, {"name": "Lasertec", "mcap": 22, "exposure": 4, "buy": 1}, {"name": "ASMPT", "mcap": 6.6, "exposure": 3, "buy": 1}, {"name": "Zeiss🌿", "mcap": 10, "exposure": 4, "buy": 0}]}, "portfolio": {"cap": "本研究组合（57% 仓位 + 37% 现金）", "subcap": "重心=后道 alpha（ASMPT）+ 紫苏叶（信越/Lasertec）", "items": [["ASMPT", 9], ["KLA", 8], ["信越", 7], ["Advantest", 6], ["ASML", 6], ["Entegris", 5], ["Lasertec", 5], ["Axcelis", 4], ["AMAT", 4], ["Photronics", 3], ["现金", 37]]}}, "chain": {"lead": "美国控设备广度 + 荷兰控光刻 + 日本控材料/涂胶/掩膜/检测 + 中国争中低端国产替代", "layers": [{"n": 0, "name": "高纯原材料/基础光学", "ch": 5, "def": "喂给光刻机的分子级输入与光学", "p": [["EUV 光学：Zeiss SMT", "eu", 1, 1, null], ["高纯石英：信越化学", "cn", 0, 0, "4063.T"], ["合成石英：Heraeus", "eu", 1, 0, null], ["EUV 用氖气：Air Liquide", "eu", 0, 0, null], ["大尺寸硅片：信越/SUMCO", "cn", 0, 0, "3436.T"], ["硅片：环球晶圆", "cn", 0, 0, null]], "note": "越上游越窄，卡脖子层层嵌套"}, {"n": 1, "name": "关键材料/耗材（材料链）", "ch": 5, "def": "随每片晶圆消耗的耗材", "p": [["EUV 光刻胶：JSR（私有）", "cn", 0, 1, null], ["EUV 光刻胶：东京应化", "cn", 0, 1, null], ["EUV 掩膜 blanks：Hoya", "cn", 0, 1, "7741.T"], ["EUV 掩膜 blanks：AGC", "cn", 0, 1, null], ["CMP 浆料：Entegris", "us", 0, 0, "ENTG"], ["CMP 浆料：卡博特", "us", 0, 0, null], ["光掩膜 merchant：Photronics", "us", 0, 0, "PLAB"], ["先进封装载板 ABF：味之素", "cn", 0, 1, null]], "note": "紫苏叶最密集层（日本垄断）"}, {"n": 2, "name": "核心前道设备（设备链利润核心）", "ch": 5, "def": "光刻/刻蚀/沉积/涂胶/注入/清洗", "p": [["光刻：ASML（EUV 100%）", "eu", 0, 0, "ASML"], ["光刻 DUV：佳能/尼康", "cn", 0, 0, null], ["刻蚀：Lam Research", "us", 0, 0, "LRCX"], ["沉积/刻蚀：Applied Materials", "us", 0, 0, "AMAT"], ["刻蚀/涂胶：东京电子", "cn", 0, 0, "8035.T"], ["刻蚀：中微公司", "cn", 0, 0, "688012.SS"], ["沉积：北方华创", "cn", 0, 0, "002371.SZ"], ["离子注入：Axcelis", "us", 0, 0, "ACLS"], ["退火/MOCVD：Veeco", "us", 0, 0, "VECO"], ["清洗：盛美 ACM Research", "us", 0, 0, "ACMR"]]}, {"n": 3, "name": "量检测/过程控制", "ch": 5, "def": "缺陷检测/计量/良率（最高毛利）", "p": [["EUV 掩膜检测：Lasertec", "cn", 0, 1, "6920.T"], ["检测/量测：KLA", "us", 0, 0, "KLAC"], ["计量：Onto Innovation", "us", 0, 0, "ONTO"], ["计量：Nova", "us", 0, 0, "NVMI"], ["先进封装 AOI：Camtek", "us", 0, 0, "CAMT"]], "note": "KLA 毛利 60%+，全链最高"}, {"n": 4, "name": "后道封装设备（AI 利润迁移点）", "ch": 4, "def": "混合键合/TCB/减薄", "p": [["混合键合：BESI（AMAT 持 9%）", "eu", 0, 0, null], ["混合键合：ASMPT", "cn", 0, 0, "2018.HK"], ["引线/TCB 键合：Kulicke & Soffa", "us", 0, 0, "KLIC"], ["减薄/切割：Disco", "cn", 0, 0, "6146.T"]], "note": "混合键合 ASP 50万→150-250万美元"}, {"n": 5, "name": "测试设备（AI 增速最快 +48%）", "ch": 4, "def": "ATE/探针卡/晶圆级老化", "p": [["SoC 测试：泰瑞达", "us", 0, 0, "TER"], ["HBM/内存测试：Advantest", "cn", 0, 0, "6857.T"], ["探针卡：FormFactor", "us", 0, 0, "FORM"], ["探针卡：Technoprobe", "eu", 0, 1, null], ["晶圆级老化：Aehr", "us", 0, 0, "AEHR"], ["分选：Cohu", "us", 0, 0, "COHU"]]}, {"n": 6, "name": "关键子系统/零部件", "ch": 3, "def": "喂给设备 OEM 的真空/电源/输送", "p": [["RF 电源/真空：MKS Instruments", "us", 0, 0, "MKSI"], ["等离子电源：Advanced Energy", "us", 0, 0, "AEIS"], ["气体输送模块：Ultra Clean", "us", 0, 0, "UCTT"], ["流体输送模块：Ichor", "us", 0, 0, "ICHR"], ["真空阀：VAT", "eu", 0, 0, null], ["真空泵：Edwards", "eu", 0, 0, null]], "note": "China 价格压力大"}, {"n": 7, "name": "终端客户（晶圆厂/IDM/OSAT）", "ch": 2, "def": "接收设备的客户", "p": [["先进逻辑：台积电", "cn", 0, 0, "2330.TW"], ["存储：SK 海力士/三星/美光", "cn", 0, 0, null], ["特种代工：Tower（硅光 #1）", "us", 0, 0, "TSEM"], ["OSAT：日月光/Amkor/长电", "cn", 0, 0, null], ["实验室自动化：Azenta", "us", 0, 0, "AZTA"], ["测量仪器横切：Keysight", "us", 0, 0, "KEYS"]]}]}, "valueflow": {"cap": "半导体材料与设备 2025 资金流总览（晶圆厂资本开支驱动 · 设备 $1330B）", "subcap": "AI 资本开支把增量集中导向第②层后道与第⑤层紫苏叶", "source": "SEMI + 各环节真调", "asof": "2025", "sources": [{"name": "晶圆厂/IDM 资本开支", "detail": "台积电+三星+SK海力士+Intel+美光 → 设备采购占资本开支 70-80%"}, {"name": "AI 算力资本开支", "detail": "超大规模厂商 → 台积电 → CoWoS 扩产 10-12 万片/月"}, {"name": "中国大基金", "detail": "RMB 5000 亿补贴 → 本土设备采购（50% 本土化令）"}], "mainflow": [{"id": "①", "name": "核心前道设备", "nature": "收入 ~$1157B WFE / 净利率 25-30%", "annot": "◄ 收入最大", "grade": 5, "pool": true, "players": ["ASML EUV 独家", "AMAT 广度", "Lam 刻蚀", "KLA 检测"], "key": "⭐ 前五大占 56-66%，光刻单极垄断", "flownote": "设备采购并行采购光刻胶/CMP/特种气体/掩膜"}, {"id": "②", "name": "后道封装+测试设备", "nature": "收入 ~$172B / 增速最快(test+48%)", "annot": "◄ 利润迁移点", "grade": 5, "pool": true, "players": ["混合键合 ASP 3-5x（BESI/ASMPT）", "测试 泰瑞达/Advantest", "探针卡 FORM"], "key": "⭐ 占设备仅 13% 但增速 48%，AI 重定价核心", "flownote": "HBM4/16层堆叠驱动"}, {"id": "③", "name": "上游材料/耗材", "nature": "收入 ~$700B / 毛利 30-70%", "annot": "耗材复购", "grade": 4, "pool": false, "players": ["EUV 光刻胶 日本~85%", "CMP Entegris/卡博特", "掩膜 blanks Hoya/AGC"], "key": "content-per-wafer 随节点微缩持续提升", "flownote": "结构性增量"}], "parallel": [{"id": "④", "name": "平行流 1：关键子系统", "grade": 4, "annot": "利润池 #2", "detail": "~$50B 市场 · MKS(RF#1)/Advanced Energy/UCT/Ichor/蔡司，高 ROIC 但被中国价格挤压"}, {"id": "⑤", "name": "平行流 2：紫苏叶层", "grade": 5, "annot": "利润池 #3", "detail": "毛利 50-70% · Zeiss 光学/日本光刻胶/Hoya-AGC 掩膜/Lasertec 掩膜检测，市值小但最不可替代"}], "pools": [{"n": 1, "text": "<b>前道设备寡头<\/b>（ASML/AMAT/Lam/KLA）净利率 25-30%", "grade": 5}, {"n": 2, "text": "<b>后道 AI 设备<\/b>（测试/混合键合）增速 48% 重定价中", "grade": 5}, {"n": 3, "text": "<b>紫苏叶材料/掩膜/光学<\/b> 毛利 50-70% 不可替代", "grade": 5}, {"n": 4, "text": "<b>关键子系统<\/b>（MKS/AE）高 ROIC 但 China 价格扰动", "grade": 4}], "takeaway": "收入规模与利润沉淀不重合——最厚利润落在工艺壁垒最陡、出货量未必最大的环节，这是标的选择的逻辑起点"}, "geo": {"cap": "半导体材料与设备 6 国世界分布（2026Q2）", "subcap": "高端环节卡位互锁，美日荷联合封锁中国先进制程", "source": "SEMI + CSIA", "asof": "2026Q2", "countries": [{"name": "美国", "color": "#8c2f23", "players": ["设备广度 AMAT/Lam", "检测 KLA", "测试 泰瑞达", "子系统 MKS/AE", "材料 Entegris", "注入 Axcelis"]}, {"name": "荷兰", "color": "#a8512f", "players": ["光刻 ASML（EUV 100%）", "混合键合 BESI"]}, {"name": "日本", "color": "#c47a3a", "players": ["涂胶显影 东京电子 88-90%", "光刻胶 JSR/TOK/信越 85%", "掩膜 Hoya", "掩膜检测 Lasertec", "减薄 Disco", "测试 Advantest"]}, {"name": "韩国", "color": "#6b6b6b", "players": ["客户 三星/SK海力士 HBM", "光刻胶 东进进入三星 3nm"]}, {"name": "欧洲", "color": "#7a6a52", "players": ["EUV 光学 Zeiss 独家", "真空阀 VAT", "探针卡 Technoprobe", "氖气 Air Liquide"]}, {"name": "中国", "color": "#3a5a78", "players": ["刻蚀 中微 5nm 验证", "沉积 北方华创", "清洗 盛美", "本土化 35%", "EUV 自给 0-1%"]}]}, "bubble": {"cap": "1 级 vs 2 级估值 × 命门纯度（紫苏叶错配区）", "subcap": "右下=便宜却命门=机会（信越/ASMPT/Hoya）；左上=动量打满（AEHR/CAMT/TSEM）", "source": "yfinance 真调", "asof": "2026-06", "xLabel": "不可或缺度 →（命门）", "yLabel": "估值/关注度 ↑", "points": [{"name": "AEHR动量", "x": 1.2, "y": 2.9, "type": "🔴", "size": 22}, {"name": "CAMT", "x": 1.5, "y": 2.7, "type": "🔴", "size": 20}, {"name": "TSEM", "x": 1.6, "y": 2.6, "type": "🔴", "size": 20}, {"name": "FORM", "x": 1.4, "y": 2.5, "type": "🔴", "size": 18}, {"name": "ASML核心", "x": 2.8, "y": 2.6, "type": "●", "size": 26}, {"name": "KLAC", "x": 2.7, "y": 2.2, "type": "●", "size": 24}, {"name": "Lasertec", "x": 2.9, "y": 1.9, "type": "🌿", "size": 24}, {"name": "Advantest", "x": 2.4, "y": 1.8, "type": "○", "size": 22}, {"name": "Entegris", "x": 2.2, "y": 1.3, "type": "◆", "size": 20}, {"name": "信越🌿", "x": 2.9, "y": 1.0, "type": "🌿", "size": 28}, {"name": "ASMPT🌿", "x": 2.6, "y": 0.9, "type": "🌿", "size": 26}, {"name": "Hoya🌿", "x": 2.7, "y": 1.1, "type": "🌿", "size": 22}, {"name": "PLAB", "x": 1.8, "y": 0.7, "type": "◆", "size": 18}, {"name": "Axcelis", "x": 2.0, "y": 1.2, "type": "◆", "size": 18}]}, "lifecycle": {"cap": "生命周期 × 卡脖子矩阵", "subcap": "最佳象限=成长×命门（混合键合/HBM测试）；成熟×命门=EUV光刻/光刻胶/掩膜", "source": "本研究", "asof": "2026Q2", "cols": ["极强（命门）", "强", "中", "弱"], "rows": [{"stage": "Embryonic 胚胎", "cells": [["硅光老化 AEHR"], [], [], []]}, {"stage": "Growth 成长", "cells": [["混合键合/HBM 测试"], ["AI 检测"], ["SiC 注入"], []]}, {"stage": "Maturity 成熟", "cells": [["EUV 光刻/光刻胶/掩膜"], ["刻蚀沉积"], ["子系统"], ["merchant 掩膜"]]}, {"stage": "Decline 衰退", "cells": [[], [], ["成熟制程"], []]}, {"stage": "Renewal 更新", "cells": [["掩膜检测 Lasertec"], ["先进封装"], [], []]}]}, "cycle": {"cap": "半导体材料与设备 · 双轴定位（生命周期 × 周期相位）", "subcap": "secular 成熟+AI 第二曲线 × cyclical 复苏中段，分化剧烈", "source": "SEMI + 本研究", "asof": "2026Q2", "secular": {"stage": "成熟期 + AI 第二曲线", "pos": 0.6, "note": "设备业 50 年成熟，但 AI/HBM/先进封装注入新 S 曲线"}, "cyclical": {"dominant": "资本开支 + 库存周期", "phase": "复苏中段", "pos": 0.45, "note": "AI/HBM 上行，成熟制程/中国抢装后承压"}, "signals": {"danger": ["Intel 2026 资本开支削减", "中国成熟制程设备订单回落（2024 抢装透支）", "memory bit 供给过快释放"], "safe": ["台积电 CoWoS 月产能 → 10-12 万片", "后道测试设备 2025 +48%", "HBM4 量产爬坡"], "watch": ["台积电 2026 资本开支 guidance（最强前瞻）", "HBM4 混合键合渗透率", "中国国产替代速度"]}, "benchmark": "vs 2017-18 存储周期：本轮 AI 需求真实性强于当年存储投机扩产，但周期中段乐观易掩盖见顶信号 → 结构性向上、周期性中段", "basis": "判断依据：trend 显示测试增速 +48% 强劲（安全）但成熟制程产能利用率偏低（局部危险）；benchbar 显示 AI 订单占比上升但中国抢装透支", "synthesis": "trend 后道高增 + benchbar AI 真实性强于 2018 → 故判 cycle = 复苏中段而非顶部，配置向 AI 纯度高的后道集中"}, "trend": {"cap": "半导体设备 · 强度指标时序（周期证据层）", "subcap": "后道测试增速碾压前道，是 AI 重定价的最强信号", "source": "SEMI 年终预测", "asof": "2025-12", "indicators": [{"name": "测试设备增速 %", "points": [8, -5, 12, 48, 12], "latest": 48, "unit": "%", "dir": "↑", "xrange": "2022–2026E", "refline": 15, "reflabel": "健康增速线", "note": "2025 +48% 异常拐点（AI/HBM）"}, {"name": "WFE 前道增速 %", "points": [10, -12, 7, 11, 9], "latest": 11, "unit": "%", "dir": "→", "xrange": "2022–2026E", "refline": 0, "reflabel": "零增长线", "note": "温和复苏"}, {"name": "NAND 设备增速 %", "points": [5, -40, 15, 45, 13], "latest": 45, "unit": "%", "dir": "↑", "xrange": "2022–2026E", "refline": 0, "reflabel": "零增长线", "note": "3D 堆叠 + 补库存双击"}, {"name": "中国本土化率 %", "points": [18, 22, 25, 35, 40], "latest": 35, "unit": "%", "dir": "↑", "xrange": "2022–2026E", "refline": 50, "reflabel": "50% 本土采购令", "note": "集中中低端，EUV 卡死"}]}, "benchbar": {"cap": "当前 vs 历史对标 · 关键比率", "subcap": "AI 需求真实性强于 2018 存储泡沫，但成熟制程承压", "source": "SEMI + 历史", "asof": "2026Q2", "analog": "2017-18 存储设备周期", "items": [{"name": "测试设备增速 %", "current": 48, "analog": 20, "danger": 50, "unit": "%", "dir": "up", "safe": false, "note": "接近历史高位，需警惕见顶"}, {"name": "中国 WFE 占全球 %", "current": 36, "analog": 15, "danger": 40, "unit": "%", "dir": "up", "safe": true, "note": "抢装透支风险"}, {"name": "中国 EUV 自给率 %", "current": 1, "analog": 0, "danger": 5, "unit": "%", "dir": "up", "safe": true, "note": "论断 1 预警阈值 5%"}]}, "tickers": {"ASML": "https://finance.yahoo.com/quote/ASML", "AMAT": "https://finance.yahoo.com/quote/AMAT", "LRCX": "https://finance.yahoo.com/quote/LRCX", "KLAC": "https://finance.yahoo.com/quote/KLAC", "ENTG": "https://finance.yahoo.com/quote/ENTG", "MKSI": "https://finance.yahoo.com/quote/MKSI", "TER": "https://finance.yahoo.com/quote/TER", "ONTO": "https://finance.yahoo.com/quote/ONTO", "ACLS": "https://finance.yahoo.com/quote/ACLS", "COHU": "https://finance.yahoo.com/quote/COHU", "NVMI": "https://finance.yahoo.com/quote/NVMI", "VECO": "https://finance.yahoo.com/quote/VECO", "FORM": "https://finance.yahoo.com/quote/FORM", "AEIS": "https://finance.yahoo.com/quote/AEIS", "KLIC": "https://finance.yahoo.com/quote/KLIC", "CAMT": "https://finance.yahoo.com/quote/CAMT", "UCTT": "https://finance.yahoo.com/quote/UCTT", "ICHR": "https://finance.yahoo.com/quote/ICHR", "PLAB": "https://finance.yahoo.com/quote/PLAB", "TSEM": "https://finance.yahoo.com/quote/TSEM", "KEYS": "https://finance.yahoo.com/quote/KEYS", "AEHR": "https://finance.yahoo.com/quote/AEHR", "AZTA": "https://finance.yahoo.com/quote/AZTA", "4063.T": "https://finance.yahoo.com/quote/4063.T", "7741.T": "https://finance.yahoo.com/quote/7741.T", "6920.T": "https://finance.yahoo.com/quote/6920.T", "8035.T": "https://finance.yahoo.com/quote/8035.T", "6857.T": "https://finance.yahoo.com/quote/6857.T", "6146.T": "https://finance.yahoo.com/quote/6146.T", "3436.T": "https://finance.yahoo.com/quote/3436.T", "2018.HK": "https://finance.yahoo.com/quote/2018.HK", "ACMR": "https://finance.yahoo.com/quote/ACMR", "002371.SZ": "https://finance.yahoo.com/quote/002371.SZ", "688012.SS": "https://finance.yahoo.com/quote/688012.SS", "2330.TW": "https://finance.yahoo.com/quote/2330.TW"}}</script>
+<script>
+const OX='#8c2f23',GO='#b8860b',GB='#c9a227',CLAY='#cbbfa6',INK='#3a352d';
+const AX={axisLine:{lineStyle:{color:'#cbbfa6'}},axisLabel:{color:'#6b655c'},splitLine:{lineStyle:{color:'#ece6d8'}}};
+const NATCLS={us:'natus',eu:'nateu',cn:'natcn',res:'natres',gate:'natgate'};
+const SYM={us:'◆',eu:'●',cn:'▲',res:'◇',gate:'■'};
+const CH=JSON.parse(document.getElementById('charts').textContent||'{}');
+const TK=CH.tickers||{};
+const stars=n=>{n=Math.max(0,Math.min(5,Math.round(Number(n)||0)));return '★'.repeat(n)+'☆'.repeat(5-n);};  // clamp[0,5] 防 ch/grade 越界 → repeat(负数) 崩图（谐波电机 ch=6 实证）
+const stripFlag=s=>String(s).replace(/^[\u{1F1E6}-\u{1F1FF}\u{2600}-\u{27BF}️\s]+/u,'').trim();
+
+/* ===== 顶部 dashboard：四图竖排全宽 ===== */
+function fr(t,c,id,h){return `<div class="figrow"><h4>${t}</h4><div class="cap">${c}</div><div id="${id}" class="chart" style="height:${h}px"></div></div>`;}
+(function(){try{
+ const d=CH.dashboard||{}; let html='';
+ if(d.tam) html+=fr('市场规模 · 自下而上三角验证',d.tam.cap||'','d_tam',300);
+ if(d.scatter) html+=fr('"买不到"的可视化',d.scatter.cap||'','d_sc',330);
+ if(d.sankey) html+=fr('资金流向 · 速览',d.sankey.cap||'','d_sk',420);
+ if(d.portfolio) html+=fr('推荐组合',d.portfolio.cap||'','d_pf',400);
+ document.getElementById('dashboard').innerHTML=html;
+ if(d.tam) echarts.init(document.getElementById('d_tam')).setOption({grid:{left:138,right:34,top:6,bottom:24},tooltip:{},xAxis:{type:'value',...AX},yAxis:{type:'category',data:d.tam.categories,axisLabel:{fontSize:11,color:'#6b655c'},axisLine:{lineStyle:{color:'#cbbfa6'}}},series:[{type:'bar',barWidth:'58%',data:d.tam.values.map((v,i)=>({value:v,itemStyle:{color:d.tam.colors?d.tam.colors[i]:OX}})),label:{show:true,position:'right',formatter:`\${@[0]}${d.tam.unit||''}`,fontSize:10,color:INK}}]});
+ if(d.scatter){const E=d.scatter.expLabels||[];const pts=d.scatter.points.map(p=>({name:p.name,value:[p.mcap,p.exposure],itemStyle:{color:p.buy?OX:'#c0392b'},symbolSize:p.buy?17:24}));
+  echarts.init(document.getElementById('d_sc')).setOption({grid:{left:90,right:34,top:14,bottom:48},tooltip:{formatter:p=>`${p.data.name}<br/>市值 ~$${p.data.value[0]}B<br/>敞口：${E[p.data.value[1]]||''}`},xAxis:{type:'log',name:'市值$B(log)',nameLocation:'middle',nameGap:32,min:0.05,max:300,...AX},yAxis:{type:'value',min:0.5,max:4.5,interval:1,axisLabel:{formatter:v=>E[v]||'',color:'#6b655c'},axisLine:{lineStyle:{color:'#cbbfa6'}},splitLine:{lineStyle:{color:'#ece6d8'}}},series:[{type:'scatter',data:pts,label:{show:true,formatter:'{b}',position:'top',fontSize:11,fontWeight:'bold',color:INK}}]});}
+ if(d.sankey) echarts.init(document.getElementById('d_sk')).setOption({tooltip:{trigger:'item'},series:[{type:'sankey',left:6,right:130,top:10,bottom:10,nodeWidth:14,nodeGap:12,label:{fontSize:11,color:'#3a352d'},data:d.sankey.nodes,links:d.sankey.links,lineStyle:{color:'gradient',opacity:.4},levels:(d.sankey.levels||[]).map(l=>({depth:l.depth,itemStyle:{color:l.color}}))}]});
+ if(d.portfolio) echarts.init(document.getElementById('d_pf')).setOption({tooltip:{trigger:'item',formatter:'{b}: {c}%'},legend:{bottom:0,textStyle:{fontSize:10,color:'#6b655c'}},series:[{type:'pie',radius:['38%','64%'],center:['50%','44%'],data:d.portfolio.items.map(p=>({name:p[0],value:p[1]})),label:{formatter:'{b} {c}%',fontSize:10,color:INK},itemStyle:{borderColor:'#faf8f3',borderWidth:2},color:[OX,'#a8483a','#c07a5a',GB,'#9a7b1f','#cbbfa6','#e7dfcc']}]});
+}catch(_e){console.warn('dashboard 渲染跳过（数据/库异常，不影响正文与其它图）:',_e);}})();
+
+/* ===== 编辑风产业链图 ===== */
+function buildChain(c){
+ const rows=(c.layers||[]).map(l=>{
+  const runs=l.p.map(x=>{const[nm,nat,pv,sh,tk]=x;return `<span class="pl ${sh?'sh':''}"><span class="sup ${NATCLS[nat]}">${SYM[nat]||''}</span>${nm}${tk?` <span class="tk">${tk}</span>`:''}${pv?'<span class="pv">私</span>':''}</span>`;}).join('<span class="sep">·</span>');
+  const note=l.note?`<span class="note">▸ ${l.note}</span>`:'';
+  const cls=l.ch>=5?'bn':l.ch>=4?'hi':'';
+  return `<div class="clayer ${cls}"><div class="num">${l.n}</div><div><div class="lname">${l.name}<span class="stars">${stars(l.ch)}</span></div><div class="ldef">${l.def}</div><div class="plist">${runs}${note}</div></div></div>`;
+ }).join('');
+ const lg=`<div class="chain-legend"><span><span class="sup natus">◆</span>美国</span><span><span class="sup nateu">●</span>日韩欧</span><span><span class="sup natcn">▲</span>中国</span><span><span class="sup natres">◇</span>资源国</span><span><span class="sup natgate">■</span>支付/监管</span><span><span class="sh">紫苏叶</span> 隐形瓶颈</span><span>★ 卡脖子(满5)</span></div>`;
+ return `<figure class="vizfig">${figHead(Object.assign({},c,{cap:c.cap||c.lead}),'')}<div class="chain-fig">${rows}${lg}</div>${figFoot(c)}</figure>`;
+}
+
+/* ===== 价值传导富渲染（保全部内容，非裸桑基）===== */
+function buildValueflow(c){
+ const src=(c.sources||[]).map(s=>`<div class="s"><b>${s.name}</b> — ${s.detail}</div>`).join('');
+ const main=(c.mainflow||[]).map((l,i)=>{
+  const cls=l.pool?'pool':(i===0?'tuna':'');
+  const players=(l.players||[]).map(p=>p).join('<span class="dot">·</span>');
+  const key=l.key?`<div class="key">⭐ ${l.key}</div>`:'';
+  const note=l.flownote?`<div class="vf-flownote">▼ ${l.flownote}</div>`:'';
+  const star=l.grade?` <span style="color:#c9a227;font-size:11px">${'★'.repeat(l.grade)}</span>`:'';
+  return `<div class="vf-layer ${cls}"><div class="lh"><span class="id">${l.id||''}</span><span class="nm">${l.name}</span>${l.nature?`<span class="nat">${l.nature}</span>`:''}${star}${l.annot?`<span class="annot">◄ ${l.annot}</span>`:''}</div><div class="pl">${players}</div>${key}</div>${note}`;
+ }).join('');
+ const par=(c.parallel||[]).map(l=>{
+  const star=l.grade?` <span style="color:#c9a227;font-size:11px">${'★'.repeat(l.grade)}</span>`:'';
+  return `<div class="vf-layer"><div class="lh"><span class="id">${l.id||''}</span><span class="nm">${l.name}</span>${star}${l.annot?`<span class="annot">◄ ${l.annot}</span>`:''}</div><div class="pl">${l.detail||''}</div></div>`;
+ }).join('');
+ const pools=(c.pools||[]).map(p=>`<div class="vf-pool"><span class="pn">${p.n}</span><span class="pt">${p.text}</span>${p.grade?`<span class="pg">${'★'.repeat(p.grade)}</span>`:''}</div>`).join('');
+ const take=c.takeaway?`<div class="vf-take"><b>一句话：</b>${c.takeaway}</div>`:'';
+ return `<figure class="vizfig">${figHead(c,'')}<div class="vf">`
+  +(src?`<div class="vf-h">资金源头</div><div class="vf-src">${src}</div><div class="vf-conn">╲ ╲ ╲  注入  ▼</div>`:'')
+  +(main?`<div class="vf-h">主链 · 利润沉淀</div>${main}`:'')
+  +(par?`<div class="vf-div">平行流 · 与主链并行</div>${par}`:'')
+  +(pools?`<div class="vf-div">⭐ 钱最终沉淀在哪 · 4 个利润池</div><div class="vf-pools">${pools}</div>`:'')
+  +take+`</div>${figFoot(c)}</figure>`;
+}
+
+/* ===== 卖方级图表描述：标题 + 结论式副标题 + 数据源脚注（V2.6 全图共用）===== */
+function figHead(c,defCap){c=c||{};const cap=c.cap||defCap||'';const sub=c.subcap?`<div class="vfig-sub">${c.subcap}</div>`:'';return `<figcaption>${cap}</figcaption>${sub}`;}
+function figFoot(c){c=c||{};const hint=c.readhint?`<span class="vfig-hint">读图 ${c.readhint}</span>`:'';const src=(c.source||c.asof)?`<span class="vfig-src">数据源 ${c.source||'→需补'}${c.asof?(' · 截至 '+c.asof):''}</span>`:'';return (hint||src)?`<div class="vfig-foot">${hint}${src}</div>`:'';}
+
+/* ===== 通用 ECharts 内联图 ===== */
+function chartFigure(c,defCap,id,h){return `<figure class="vizfig">${figHead(c,defCap)}<div id="${id}" class="vchart" style="height:${h}px"></div>${figFoot(c)}</figure>`;}
+function renderGeo(el,c){const id=el.id+'_v';el.outerHTML=chartFigure(c,'国别玩家分布（块面积 = 该国玩家数 / 集中度）',id,460);
+ const data=(c.countries||[]).map(co=>({name:stripFlag(co.name),itemStyle:{color:co.color},children:(co.players||[]).map(p=>({name:p,value:1}))}));
+ echarts.init(document.getElementById(id)).setOption({tooltip:{formatter:p=>p.name},series:[{type:'treemap',roam:false,nodeClick:false,breadcrumb:{show:false},width:'100%',height:'100%',
+  label:{fontSize:12,color:'#fff',overflow:'breakAll'},
+  /* 国别标题：白字 + 深色 pill 底，浅色背景下也清晰可读 */
+  upperLabel:{show:true,height:28,color:'#fff',fontWeight:'bold',fontSize:13,backgroundColor:'rgba(28,24,20,0.66)',padding:[4,9],borderRadius:2,align:'left'},
+  itemStyle:{borderColor:'#faf8f3',borderWidth:2,gapWidth:2},
+  levels:[{itemStyle:{borderWidth:0,gapWidth:5},upperLabel:{show:false}},{itemStyle:{gapWidth:1},upperLabel:{show:true}}],data:data}]});}
+function renderBubble(el,c){const id=el.id+'_v';
+ /* 图例 + 象限标签可选覆盖（industry 默认估值口径；manifesto/author 传自己的确信度口径）*/
+ const legend=(c.legend!==undefined)?c.legend:'<span style="color:#8c2f23">◆底仓</span> <span style="color:#c0392b">●不可买</span> <span style="color:#1e7e4f">○近纯微盘</span> <span style="color:#b8860b">🌿紫苏叶</span>';
+ el.outerHTML=chartFigure(Object.assign({},c,{cap:(c.cap||'估值气泡图')+(legend?' &nbsp;·&nbsp; '+legend:'')}),null,id,440);
+ const TYC={'◆':OX,'●':'#c0392b','○':'#1e7e4f','🌿':GB};
+ const pts=(c.points||[]).map(p=>({name:p.name,value:[p.x,p.y],symbolSize:p.size||22,itemStyle:{color:TYC[p.type]||CLAY,opacity:.85},label:{show:true,formatter:p.name,position:'right',fontSize:11,color:INK}}));
+ const quad=c.quads||[{value:[0.6,2.6],t:'贵 · 但不命门'},{value:[2.4,2.6],t:'又贵又命门'},{value:[0.6,0.4],t:'便宜 · 也不命门'},{value:[2.35,0.4],t:'★ 便宜却命门 = 机会'}];
+ echarts.init(document.getElementById(id)).setOption({grid:{left:64,right:158,top:24,bottom:48},
+  tooltip:{formatter:p=>p.data.name?p.data.name:''},
+  xAxis:{name:c.xLabel||'不可或缺度 →（命门）',nameLocation:'middle',nameGap:30,min:0,max:3,axisLabel:{show:false},...AX},
+  yAxis:{name:c.yLabel||'估值 / 关注度 ↑',nameLocation:'middle',nameGap:24,nameRotate:90,min:0,max:3,axisLabel:{show:false},...AX},
+  series:[
+   {type:'scatter',data:pts,markLine:{silent:true,symbol:'none',label:{show:false},lineStyle:{color:'#d8cdb4',type:'dashed'},data:[{xAxis:1.5},{yAxis:1.5}]}},
+   {type:'scatter',symbolSize:0,silent:true,data:quad.map(q=>({value:q.value,label:{show:true,formatter:q.t,color:q.t[0]==='★'?'#9a7b1f':'#bcae93',fontSize:11,fontWeight:q.t[0]==='★'?'bold':'normal'}}))}
+  ]});}
+
+/* ===== 生命周期 × 卡脖子定位矩阵（A.2）===== */
+function renderLifecycle(el,c){
+ const cols=c.cols||[];
+ const tint=['rgba(140,47,35,.13)','rgba(154,123,31,.11)','rgba(107,101,92,.07)','rgba(168,158,140,.05)'];
+ const hdr=['#8c2f23','#9a7b1f','#7a746a','#a89e8c'];
+ let h='<figure class="vizfig">'+figHead(c,'生命周期 × 卡脖子定位矩阵');
+ h+='<div class="lcm" style="grid-template-columns:118px repeat('+cols.length+',1fr)">';
+ h+='<div class="lc-corner">生命周期 ＼ 卡脖子</div>';
+ cols.forEach((cl,i)=>h+='<div class="lc-h" style="background:'+(hdr[i]||hdr[hdr.length-1])+'">'+cl+'</div>');
+ (c.rows||[]).forEach(r=>{
+  h+='<div class="lc-row">'+r.stage+'</div>';
+  (r.cells||[]).forEach((cell,i)=>{
+   const items=(cell||[]).filter(Boolean);
+   h+='<div class="lc-cell" style="background:'+(tint[i]||tint[tint.length-1])+'">'+(items.length?items.map(x=>'<span class="lc-chip">'+x+'</span>').join(''):'<span class="lc-dash">—</span>')+'</div>';
+  });
+ });
+ h+='</div>'+figFoot(c)+'</figure>';el.outerHTML=h;
+}
+
+/* ===== A线 manifesto/author 新增渲染器（timeline / scorecard / gauge / network）===== */
+function renderTimeline(el,c){const items=(c.items||[]).map(it=>`<div class="tl-it ${it.up?'up':''}"><span class="d">${it.date||''}</span>${it.tag?`<span class="tag">${it.tag}</span>`:''}<div class="t">${it.title||''}</div>${it.detail?`<div class="x">${it.detail}</div>`:''}</div>`).join('');el.outerHTML=`<figure class="vizfig">${figHead(c,'时间线')}<div class="tl">${items}</div>${figFoot(c)}</figure>`;}
+function renderScorecard(el,c){const IC={hit:['hit','✓'],miss:['miss','✗'],part:['part','~'],partial:['part','~']};const rows=(c.items||[]).map(it=>{const o=IC[it.outcome]||['part','~'];return `<div class="row"><span class="ic ${o[0]}">${o[1]}</span><span class="dt">${it.date||''}</span><span class="pr"><b>${it.pred||''}</b>${it.note?`<span class="nt">${it.note}</span>`:''}</span></div>`;}).join('');el.outerHTML=`<figure class="vizfig">${figHead(c,'历史预测命中率')}<div class="scard"><div class="hr"><span class="big">${c.hitrate||''}</span><span class="lb">${c.note||'命中率（Claude 自动评 · 含幸存者偏差/自报/择时折扣）'}</span></div>${rows}</div>${figFoot(c)}</figure>`;}
+function renderGauge(el,c){const subs=(c.subscores||[]).map(s=>{const mx=s.max||5,pct=Math.max(0,Math.min(100,Math.round((s.val/mx)*100)));return `<span class="nm">${s.name}</span><span class="bar"><i style="width:${pct}%"></i></span><span class="vv">${s.val}/${mx}</span>`;}).join('');el.outerHTML=`<figure class="vizfig">${figHead(c,'评分')}<div class="gau"><div class="top"><span class="big">${c.score}</span><span class="mx">/ ${c.max||5}</span><span class="lb">${c.label||''}</span></div>${subs?`<div class="sub">${subs}</div>`:''}</div>${figFoot(c)}</figure>`;}
+function renderNetwork(el,c){const id=el.id+'_v';el.outerHTML=chartFigure(c,'关联思想圈',id,400);const groups=[...new Set((c.nodes||[]).map(n=>n.group||'其他'))];const pal=[OX,'#1e7e4f',GB,'#3a6ea5','#6d4c9a','#a89e8c'];echarts.init(document.getElementById(id)).setOption({tooltip:{},legend:{bottom:0,textStyle:{fontSize:10,color:'#6b655c'},data:groups},series:[{type:'graph',layout:'force',roam:true,label:{show:true,fontSize:11,color:'#3a352d'},force:{repulsion:130,edgeLength:80},categories:groups.map(g=>({name:g})),data:(c.nodes||[]).map(n=>({name:n.name,category:groups.indexOf(n.group||'其他'),symbolSize:n.size||24,itemStyle:{color:pal[groups.indexOf(n.group||'其他')%pal.length]}})),links:(c.links||[]).map(l=>({source:l.source,target:l.target})),lineStyle:{color:'#cbbfa6',width:1.2,curveness:0.08}}]});}
+
+/* ===== industry 双轴定位：生命周期 S 曲线 × 周期相位（纯 SVG 编辑卡）===== */
+function renderCycle(el,c){
+ const sec=c.secular||{},cyc=c.cyclical||{},sig=c.signals||{};
+ const sp=Math.max(0,Math.min(1,sec.pos!=null?sec.pos:0.5));
+ const cp=Math.max(0,Math.min(1,cyc.pos!=null?cyc.pos:0.5));
+ const W=320;
+ /* ① 生命周期 S 曲线（logistic，左低右高）*/
+ const sy=t=>58-(1/(1+Math.exp(-11*(t-0.5))))*48;
+ let spath='';for(let i=0;i<=48;i++){const t=i/48;spath+=(i?'L':'M')+(t*W).toFixed(1)+' '+sy(t).toFixed(1)+' ';}
+ const ST=[['萌芽',0.125],['成长',0.375],['成熟',0.625],['衰退',0.875]];
+ const sticks=ST.map(s=>`<text x="${(s[1]*W).toFixed(0)}" y="65" text-anchor="middle" font-size="9" fill="#a89e8c">${s[0]}</text>`).join('');
+ /* A3 轨迹：上期→当前（空心=上期、实心=当前），示意移动方向 */
+ const traj=(prev,cur,yf,color)=>{if(prev==null||!isFinite(prev))return '';const x1=(prev*W),y1=yf(prev);return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)} L${(cur*W).toFixed(1)} ${yf(cur).toFixed(1)}" stroke="${color}" stroke-width="2" opacity=".5"/><circle cx="${x1.toFixed(1)}" cy="${y1.toFixed(1)}" r="3" fill="#faf8f3" stroke="${color}" stroke-width="1.5"/>`;};
+ const sdot=`<circle cx="${(sp*W).toFixed(1)}" cy="${sy(sp).toFixed(1)}" r="5" fill="${OX}" stroke="#faf8f3" stroke-width="2"/>`;
+ const svgS=`<svg viewBox="0 0 ${W} 70"><path d="${spath}" fill="none" stroke="#cbbfa6" stroke-width="2"/>${traj(sec.prevPos,sp,sy,OX)}${sdot}${sticks}</svg>`;
+ /* ② 周期相位正弦（t=0 触底 → 0.5 见顶 → 1 触底）*/
+ const cyv=t=>35+22*Math.cos(2*Math.PI*t);
+ let cpath='';for(let i=0;i<=64;i++){const t=i/64;cpath+=(i?'L':'M')+(t*W).toFixed(1)+' '+cyv(t).toFixed(1)+' ';}
+ const PH=[['触底',0.0],['扩张',0.25],['见顶',0.5],['收缩',0.75]];
+ const cticks=PH.map(p=>`<text x="${(p[1]*W).toFixed(0)}" y="65" text-anchor="${p[1]===0?'start':'middle'}" font-size="9" fill="#a89e8c">${p[0]}</text>`).join('');
+ const cdot=`<circle cx="${(cp*W).toFixed(1)}" cy="${cyv(cp).toFixed(1)}" r="5" fill="${GO}" stroke="#faf8f3" stroke-width="2"/>`;
+ const svgC=`<svg viewBox="0 0 ${W} 70"><path d="${cpath}" fill="none" stroke="#cbbfa6" stroke-width="2"/>${traj(cyc.prevPos,cp,cyv,GO)}${cdot}${cticks}</svg>`;
+ const col=(cls,h,arr)=>`<div class="col ${cls}"><h5>${h}</h5><ul>${((arr&&arr.length)?arr:['→需补']).map(x=>`<li>${x}</li>`).join('')}</ul></div>`;
+ const basis=c.basis?`<div class="cyc-basis"><b>判断依据：</b>${c.basis}</div>`:'';
+ const bm=c.benchmark?`<div class="cyc-bm"><b>历史对标：</b>${c.benchmark}</div>`:'';
+ const syn=c.synthesis?`<div class="cyc-syn">▶ 证据链：${c.synthesis}</div>`:'';
+ const cc=Object.assign({readhint:'横看结构（S曲线）、纵看周期（正弦）；空心点=上期、实心点=当前'},c);
+ el.outerHTML=`<figure class="vizfig">${figHead(cc,'双轴定位 · 生命周期 × 周期相位')}<div class="cyc">`
+  +`<div class="cyc-ax"><div class="cyc-lbl">① 生命周期（结构性）· 当前 <b>${sec.stage||'—'}</b>${sec.note?' · '+sec.note:''}</div>${svgS}</div>`
+  +`<div class="cyc-ax"><div class="cyc-lbl">② 周期相位（周期性）· 主导 ${cyc.dominant||'—'} · 当前 <b>${cyc.phase||'—'}</b>${cyc.note?' · '+cyc.note:''}</div>${svgC}</div>`
+  +`<div class="cyc-sig">${col('danger','⚠ 危险信号（→见顶/反转）',sig.danger)}${col('safe','✓ 安全信号（扩张可持续）',sig.safe)}${col('watch','◉ 关键观察变量',sig.watch)}</div>`
+  +basis+bm+syn+`</div>${figFoot(cc)}</figure>`;
+}
+
+/* ===== industry 周期证据层①：强度指标时序小多图（纯 SVG sparkline）===== */
+function renderTrend(el,c){
+ const inds=c.indicators||[];
+ const spark=ind=>{const a=(ind.points||[]).filter(v=>v!=null&&isFinite(v));const W=200,H=48,n=a.length;
+  if(n<2)return '<svg viewBox="0 0 '+W+' '+H+'"><text x="6" y="26" font-size="10" fill="#a89e8c">→需补</text></svg>';
+  const rf=Number(ind.refline),vals=isFinite(rf)?a.concat([rf]):a;
+  const mn=Math.min(...vals),mx=Math.max(...vals),rg=(mx-mn)||1,x=i=>(i/(n-1))*W,y=v=>H-11-((v-mn)/rg)*(H-20);
+  let p='';for(let i=0;i<n;i++)p+=(i?'L':'M')+x(i).toFixed(1)+' '+y(a[i]).toFixed(1)+' ';
+  /* A1 参考线（现金成本 / 100% / 饱和线）*/
+  let ref='';if(isFinite(rf)){const ry=y(rf).toFixed(1);ref='<line x1="0" y1="'+ry+'" x2="'+W+'" y2="'+ry+'" stroke="#c0392b" stroke-width="1" stroke-dasharray="3 3" opacity=".55"/><text x="'+W+'" y="'+(y(rf)-2).toFixed(1)+'" text-anchor="end" font-size="7.5" fill="#c0392b">'+(ind.reflabel||('参考 '+rf))+'</text>';}
+  /* A1 拐点（内部极值 = 转向点）*/
+  let ai=0,xi=0;for(let i=1;i<n-1;i++){if(a[i]<a[ai])ai=i;if(a[i]>a[xi])xi=i;}
+  let ti=-1;if(ai>0&&ai<n-1&&a[ai]<a[0]&&a[ai]<a[n-1])ti=ai;else if(xi>0&&xi<n-1&&a[xi]>a[0]&&a[xi]>a[n-1])ti=xi;
+  const turn=ti>=0?'<circle cx="'+x(ti).toFixed(1)+'" cy="'+y(a[ti]).toFixed(1)+'" r="3" fill="#faf8f3" stroke="'+GO+'" stroke-width="2"/>':'';
+  /* A1 时间轴端点标 */
+  const xr=ind.xrange?String(ind.xrange).split(/[–\-→~]/):null;
+  const xlab=xr&&xr.length>=2?'<text x="0" y="'+(H-1)+'" font-size="7.5" fill="#bcae93">'+xr[0]+'</text><text x="'+W+'" y="'+(H-1)+'" text-anchor="end" font-size="7.5" fill="#bcae93">'+xr[xr.length-1]+'</text>':'';
+  return '<svg viewBox="0 0 '+W+' '+H+'">'+ref+'<path d="'+p+'" fill="none" stroke="#cbbfa6" stroke-width="2"/>'+turn+'<circle cx="'+x(n-1).toFixed(1)+'" cy="'+y(a[n-1]).toFixed(1)+'" r="3.6" fill="'+OX+'"/>'+xlab+'</svg>';};
+ const DIR={'↑':'#1e7e4f','↓':'#c0392b','→':GO};
+ const cells=inds.map(ind=>{const dir=ind.dir||'→';return `<div class="tr-cell"><div class="tr-nm">${ind.name||''}</div>${spark(ind)}<div class="tr-foot"><span class="tr-val">${ind.latest!=null?ind.latest:'→需补'}${(ind.latest!=null&&ind.unit)?ind.unit:''}</span><span class="tr-dir" style="color:${DIR[dir]||GO}">${dir}</span></div>${ind.note?`<div class="tr-note">${ind.note}</div>`:''}</div>`;}).join('');
+ const cc=Object.assign({readhint:'每格一指标：灰线=时序 · 实心点=最新 · 空心点=拐点 · 红虚线=参考/阈值 · 底标起止年'},c);
+ el.outerHTML=`<figure class="vizfig">${figHead(cc,'强度指标时序 · 周期证据层')}<div class="tr">${cells}</div>${figFoot(cc)}</figure>`;
+}
+
+/* ===== industry 周期证据层②：当前 vs 历史泡沫阈值对标条 ===== */
+function renderBenchbar(el,c){
+ const rows=(c.items||[]).map(it=>{
+  const cur=Number(it.current),dg=Number(it.danger),anl=Number(it.analog),okCur=isFinite(cur);
+  const refs=[cur,dg,anl].filter(isFinite),max=refs.length?Math.max.apply(null,refs)*1.18:1;
+  const pct=v=>Math.max(0,Math.min(100,(v/max)*100));
+  /* A2 方向：up=越高越危险 / down=越低越危险；safe 优先显式给 */
+  const dir=it.dir||(isFinite(dg)?(dg>=cur?'up':'down'):'up');
+  let safe=it.safe;if(safe==null&&isFinite(dg))safe=(dir==='up')?(cur<dg):(cur>dg);if(safe==null)safe=true;
+  const bc=safe?'#1e7e4f':'#c0392b';
+  const curTxt=okCur?(cur+(it.unit||'')):'→需补';
+  const dirHint=dir==='down'?'↓越低越危险':'↑越高越危险';
+  const curBar=okCur?`<div class="bb-fill" style="width:${Math.max(2,pct(cur)).toFixed(1)}%;background:${bc}"></div>`:'';
+  const anMark=isFinite(anl)?`<div class="bb-anmark" style="left:${pct(anl).toFixed(1)}%"></div>`:'';
+  const thr=isFinite(dg)?`<div class="bb-thr" style="left:${pct(dg).toFixed(1)}%"></div>`:'';
+  const refTxt=[isFinite(anl)?`<span class="bb-ref">◆对标 ${anl}${it.unit||''}</span>`:'',isFinite(dg)?`<span class="bb-dg">┊阈值 ${dg}${it.unit||''}</span>`:''].filter(Boolean).join('　');
+  return `<div class="bb-row"><div class="bb-nm">${it.name||''}<span class="bb-dir">${dirHint}</span></div><div class="bb-track">${curBar}${anMark}${thr}</div><div class="bb-val"><b style="color:${bc}">${curTxt}</b>${refTxt?`<span class="bb-refline">${refTxt}</span>`:''}</div>${it.note?`<div class="bb-note">▸ ${it.note}</div>`:''}</div>`;
+ }).join('');
+ const an=c.analog?`<div class="bb-an">对标基准：<b>${c.analog}</b> · 条=当前值（绿安全/红风险）· ◆=历史对标水平 · ┊=危险阈值</div>`:'';
+ const cc=Object.assign({readhint:'每行 当前值 vs ◆历史对标 vs ┊危险阈值，看安全边际还剩多少'},c);
+ el.outerHTML=`<figure class="vizfig">${figHead(cc,'当前 vs 历史泡沫 · 关键比率对标')}<div class="bb">${an}${rows}</div>${figFoot(cc)}</figure>`;
+}
+
+/* ===== V2.7.1 通用解剖渲染原型库 =====================================
+   设计：data 驱动 + 可扩展原型 + path 逃生舱，服务任意技术类型（HBM/显卡/光模块/机器人/电池/天线…）。
+   ── BOARD_SHELL[shape](BW,BH)：原型外壳，画该原型的示意轮廓+特征（一眼认出，非工程精确）。
+   ── PART_GLYPH[shape](px,py,pw,ph,fill,p)：部件图元，画有辨识度的器件符号；fill 一律 = gcol(grade)（色深=卡脖子度）。
+   逃生舱：board.path / parts[].path 直接给自定义轮廓 d 值 → 库里没有的物体无需改代码。
+   三重缺省回退（零回归）：board.shape 缺→扁平 ab-bg 底板；parts[].shape 缺→rect 图元；parts 缺坐标→只出图例表。*/
+const _f1=v=>Number(v).toFixed(1);
+/* 原型外壳库：返回外壳 SVG（不含部件）。每个示意级即可。*/
+const BOARD_SHELL={
+ /* PCB：板轮廓 + 底边金手指齿 + 四角安装孔 + 内缩丝印边框 + 几条示意走线 */
+ pcb(W,H){const gn=Math.max(5,Math.round(W/26)),gw=W/(gn*2-1),gy=H-7,r=Math.min(7,Math.round(Math.min(W,H)/10));
+  let g='';for(let i=0;i<gn;i++){const gx=i*gw*2;g+=`<rect class="ab-metal" x="${_f1(gx)}" y="${_f1(gy)}" width="${_f1(gw)}" height="7" rx="1"/>`;}
+  const m=9,hr=3.4;let holes='';[[m,m],[W-m,m],[m,H-m-7],[W-m,H-m-7]].forEach(p=>holes+=`<circle class="ab-hole" cx="${_f1(p[0])}" cy="${_f1(p[1])}" r="${hr}"/>`);
+  let tr='';for(let i=0;i<4;i++){const ty=14+i*((H-30)/3);tr+=`<path class="ab-trace" d="M14 ${_f1(ty)} H${_f1(W*0.4)} V${_f1(ty+9)} H${_f1(W-16)}"/>`;}
+  return `<rect class="ab-shell" x="0" y="0" width="${_f1(W)}" height="${_f1(H)}" rx="${r}"/>`
+   +`<rect class="ab-edge-d" x="6" y="6" width="${_f1(W-12)}" height="${_f1(H-13)}" rx="${Math.max(2,r-3)}"/>`+tr+g+holes;},
+ /* STACK：芯片叠层侧剖面 = 一摞带厚度/分隔缝的水平层 + 左侧贯穿 TSV 竖线（部件另由 section 布局叠放）*/
+ stack(W,H){const r=4,n=5;let layers='';for(let i=0;i<n;i++){const ly=6+i*((H-12)/n),lh=(H-12)/n;
+   layers+=`<rect class="ab-shell2" x="10" y="${_f1(ly)}" width="${_f1(W-20)}" height="${_f1(lh-1.5)}" rx="1.5"/>`;}
+  const tsv=`<line class="ab-tsv" x1="20" y1="6" x2="20" y2="${_f1(H-6)}"/><line class="ab-tsv" x1="${_f1(W-20)}" y1="6" x2="${_f1(W-20)}" y2="${_f1(H-6)}"/>`;
+  return `<rect class="ab-shell" x="0" y="0" width="${_f1(W)}" height="${_f1(H)}" rx="${r}"/>${layers}${tsv}`;},
+ /* MODULE：金属外壳 + 左侧光口圆 + 法兰螺孔 */
+ module(W,H){const r=16;const cy=H/2,pr=Math.min(13,H*0.16);
+  let scr='';[[12,12],[W-12,12],[12,H-12],[W-12,H-12]].forEach(p=>scr+=`<circle class="ab-hole" cx="${_f1(p[0])}" cy="${_f1(p[1])}" r="2.6"/>`);
+  const port=`<circle class="ab-metal" cx="14" cy="${_f1(cy)}" r="${_f1(pr)}"/><circle class="ab-hole" cx="14" cy="${_f1(cy)}" r="${_f1(pr*0.5)}"/>`;
+  return `<rect class="ab-shell" x="0" y="0" width="${_f1(W)}" height="${_f1(H)}" rx="${r}"/>`
+   +`<rect class="ab-edge-d" x="7" y="7" width="${_f1(W-14)}" height="${_f1(H-14)}" rx="${r-5}"/>${scr}${port}`;},
+ /* MECH：机械件剖面 = 外壳轮廓 + 中心轴/转子示意 + 端盖缝 */
+ mech(W,H){const r=10,cx=W/2,cy=H/2,ro=Math.min(W,H)*0.34,ri=ro*0.4;
+  return `<rect class="ab-shell" x="0" y="0" width="${_f1(W)}" height="${_f1(H)}" rx="${r}"/>`
+   +`<line class="ab-edge" x1="${_f1(W*0.18)}" y1="6" x2="${_f1(W*0.18)}" y2="${_f1(H-6)}"/>`
+   +`<circle class="ab-shell2" cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(ro)}"/>`
+   +`<circle class="ab-metal" cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(ri)}"/>`
+   +`<line class="ab-edge" x1="${_f1(cx)}" y1="${_f1(cy-ro)}" x2="${_f1(cx)}" y2="${_f1(cy+ro)}"/>`;},
+ /* DIE：芯片裸晶 floorplan = 外框 + 网格分区底纹 + 内缩 seal-ring */
+ die(W,H){const r=3,step=Math.max(18,Math.round(W/8));let grid='';
+  for(let gx=step;gx<W;gx+=step)grid+=`<line class="ab-glyph-ln" x1="${_f1(gx)}" y1="4" x2="${_f1(gx)}" y2="${_f1(H-4)}"/>`;
+  for(let gy=step;gy<H;gy+=step)grid+=`<line class="ab-glyph-ln" x1="4" y1="${_f1(gy)}" x2="${_f1(W-4)}" y2="${_f1(gy)}"/>`;
+  return `<rect class="ab-shell2" x="0" y="0" width="${_f1(W)}" height="${_f1(H)}" rx="${r}"/>`
+   +`<rect class="ab-edge" x="5" y="5" width="${_f1(W-10)}" height="${_f1(H-10)}" rx="2"/>${grid}`;}
+};
+/* 部件图元库：返回部件 SVG（轮廓+内部特征），fill=gcol(grade)。rect=现状兜底。*/
+const PART_GLYPH={
+ rect(x,y,w,h,fill){return `<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="3" fill="${fill}" fill-opacity=".88"/>`;},
+ /* chip：黑体 + 四边引脚短线 + pin-1 角点 */
+ chip(x,y,w,h,fill){const np=Math.max(2,Math.min(5,Math.round(w/12))),sp=w/(np+1),L=4;let pins='';
+  for(let i=1;i<=np;i++){const px=x+sp*i;pins+=`<line class="ab-pin" x1="${_f1(px)}" y1="${_f1(y)}" x2="${_f1(px)}" y2="${_f1(y-L)}"/><line class="ab-pin" x1="${_f1(px)}" y1="${_f1(y+h)}" x2="${_f1(px)}" y2="${_f1(y+h+L)}"/>`;}
+  const nv=Math.max(2,Math.min(5,Math.round(h/12))),vp=h/(nv+1);
+  for(let i=1;i<=nv;i++){const py=y+vp*i;pins+=`<line class="ab-pin" x1="${_f1(x)}" y1="${_f1(py)}" x2="${_f1(x-L)}" y2="${_f1(py)}"/><line class="ab-pin" x1="${_f1(x+w)}" y1="${_f1(py)}" x2="${_f1(x+w+L)}" y2="${_f1(py)}"/>`;}
+  return pins+`<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="2" fill="${fill}" fill-opacity=".9"/>`
+   +`<circle class="ab-pin1" cx="${_f1(x+4)}" cy="${_f1(y+4)}" r="1.7"/>`;},
+ /* die：裸晶 + 对角划片纹 */
+ die(x,y,w,h,fill){return `<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="1.5" fill="${fill}" fill-opacity=".9"/>`
+  +`<line class="ab-glyph-ln" x1="${_f1(x)}" y1="${_f1(y)}" x2="${_f1(x+w)}" y2="${_f1(y+h)}"/><line class="ab-glyph-ln" x1="${_f1(x+w)}" y1="${_f1(y)}" x2="${_f1(x)}" y2="${_f1(y+h)}"/>`;},
+ /* connector：金手指齿 / 插针阵列 */
+ connector(x,y,w,h,fill){const n=Math.max(3,Math.round(w/7)),fw=w/(n*1.6);let f='';
+  for(let i=0;i<n;i++){const fx=x+i*(w/n)+ (w/n-fw)/2;f+=`<rect x="${_f1(fx)}" y="${_f1(y)}" width="${_f1(fw)}" height="${_f1(h)}" rx="1" fill="${fill}" fill-opacity=".92"/>`;}
+  return `<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="1" fill="none" stroke="${fill}" stroke-width="1" opacity=".5"/>${f}`;},
+ /* heatsink：竖鳍片排 */
+ heatsink(x,y,w,h,fill){const n=Math.max(3,Math.round(w/6)),fw=w/(n*1.8);let f='';
+  for(let i=0;i<n;i++){const fx=x+i*(w/n);f+=`<rect x="${_f1(fx)}" y="${_f1(y)}" width="${_f1(fw)}" height="${_f1(h)}" rx="1" fill="${fill}" fill-opacity=".82"/>`;}
+  return f+`<rect x="${_f1(x)}" y="${_f1(y+h-3)}" width="${_f1(w)}" height="3" fill="${fill}" fill-opacity=".95"/>`;},
+ /* capacitor：圆柱 + 极性条 */
+ capacitor(x,y,w,h,fill){const cx=x+w/2;return `<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="${_f1(Math.min(w,h)/2.4)}" fill="${fill}" fill-opacity=".88"/>`
+  +`<ellipse cx="${_f1(cx)}" cy="${_f1(y+3)}" rx="${_f1(w/2-1)}" ry="2.2" fill="none" class="ab-glyph-ln"/>`
+  +`<rect x="${_f1(x+1.5)}" y="${_f1(y+3)}" width="2.4" height="${_f1(h-6)}" fill="var(--paper2)" opacity=".75"/>`;},
+ /* coil：线圈 / 绕组弧线（电机/电感）*/
+ coil(x,y,w,h,fill){const cx=x+w/2,cy=y+h/2,n=Math.max(3,Math.round(w/9)),rw=w/(n+1);let arcs='';
+  for(let i=0;i<n;i++){const ax=x+rw*(i+0.7);arcs+=`<ellipse cx="${_f1(ax)}" cy="${_f1(cy)}" rx="${_f1(rw*0.55)}" ry="${_f1(h/2-1.5)}" fill="none" stroke="${fill}" stroke-width="1.6" opacity=".82"/>`;}
+  return `<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="3" fill="${fill}" fill-opacity=".14"/>${arcs}`;},
+ /* gear：齿轮（机械）*/
+ gear(x,y,w,h,fill){const cx=x+w/2,cy=y+h/2,R=Math.min(w,h)/2-1,nt=10;let teeth='';
+  for(let i=0;i<nt;i++){const a=(i/nt)*2*Math.PI,a2=a+Math.PI/nt*0.55;
+   teeth+=`<line x1="${_f1(cx+Math.cos(a)*R*0.82)}" y1="${_f1(cy+Math.sin(a)*R*0.82)}" x2="${_f1(cx+Math.cos(a2)*R)}" y2="${_f1(cy+Math.sin(a2)*R)}" stroke="${fill}" stroke-width="2.4" stroke-linecap="round"/>`;}
+  return teeth+`<circle cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R*0.78)}" fill="${fill}" fill-opacity=".88"/><circle cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R*0.3)}" fill="var(--paper2)"/>`;},
+ /* cell：电芯（电池）+ 正极柱 */
+ cell(x,y,w,h,fill){return `<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="2.5" fill="${fill}" fill-opacity=".88"/>`
+  +`<rect x="${_f1(x+w/2-3)}" y="${_f1(y-2.5)}" width="6" height="3" rx="1" fill="${fill}"/>`
+  +`<line class="ab-glyph-ln" x1="${_f1(x+3)}" y1="${_f1(y+h/2)}" x2="${_f1(x+w-3)}" y2="${_f1(y+h/2)}"/>`;},
+ /* lens：透镜 / 同心圆（光学）*/
+ lens(x,y,w,h,fill){const cx=x+w/2,cy=y+h/2,R=Math.min(w,h)/2-1;return `<circle cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R)}" fill="${fill}" fill-opacity=".5"/>`
+  +`<circle cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R*0.62)}" fill="none" stroke="${fill}" stroke-width="1.4"/><circle cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R*0.28)}" fill="${fill}" fill-opacity=".95"/>`;},
+ /* port：光口同心圆（带法兰）*/
+ port(x,y,w,h,fill){const cx=x+w/2,cy=y+h/2,R=Math.min(w,h)/2-1;return `<circle class="ab-metal" cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R)}"/>`
+  +`<circle cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R*0.55)}" fill="${fill}" fill-opacity=".9"/><circle cx="${_f1(cx)}" cy="${_f1(cy)}" r="${_f1(R*0.22)}" fill="var(--paper2)"/>`;},
+ /* stack-layer：带厚度阴影的叠层条（叠层剖面用）*/
+ 'stack-layer'(x,y,w,h,fill){return `<rect x="${_f1(x)}" y="${_f1(y)}" width="${_f1(w)}" height="${_f1(h)}" rx="1.5" fill="${fill}" fill-opacity=".9"/>`
+  +`<rect x="${_f1(x)}" y="${_f1(y+h-2.2)}" width="${_f1(w)}" height="2.2" fill="#000" opacity=".18"/>`
+  +`<line class="ab-glyph-ln" x1="${_f1(x)}" y1="${_f1(y+0.8)}" x2="${_f1(x+w)}" y2="${_f1(y+0.8)}"/>`;}
+};
+/* ===== techdive 实体标注解剖图：编号 callout schematic + 图例表（纯 SVG 编辑卡 + HTML 表）=====
+   部件按 grade(1-5) 用 oxblood→faint 渐变着色；ticker 以纯文本输出，复用全局 ticker→Yahoo linkify。
+   V2.7.1：升级为通用标注解剖图——BOARD_SHELL 外壳原型 + PART_GLYPH 部件图元 + path 逃生舱 + section 剖面视图 + 外置 leader-line 标注。
+   降级（零回归）：board.shape 缺→扁平 ab-bg；parts[].shape 缺→rect；parts 缺 x/y 坐标 → 只渲图例表（诚实不假装）。*/
+function renderAnatomy(c){
+ const parts=(c.parts||[]);
+ const GRADE=['#cbbfa6','#bf9a8c','#b66f5d','#a8483a','#8c2f23']; // grade 1→5: faint → oxblood
+ const tint =['rgba(203,195,182,.18)','rgba(191,154,140,.20)','rgba(182,111,93,.22)','rgba(168,72,58,.24)','rgba(140,47,35,.26)'];
+ const gcol=g=>{const i=Math.max(1,Math.min(5,Number(g)||1))-1;return GRADE[i];};
+ const gtint=g=>{const i=Math.max(1,Math.min(5,Number(g)||1))-1;return tint[i];};
+ const stripsec=s=>String(s==null?'':s);
+ /* ① 解剖板（SVG）— 仅当 parts 全有 x/y 坐标时绘制 */
+ const placed=parts.filter(p=>p&&isFinite(Number(p.x))&&isFinite(Number(p.y)));
+ const bd=c.board||{};
+ const section=bd.view==='section';
+ /* 是否启用任一新特性（外壳原型 / path 逃生舱 / 剖面视图 / 部件图元）——
+    ★ 零回归关键：只有显式请求新特性才走富渲染；不带任何新字段的老 anatomy JSON → legacy 分支 → 字节级不变。
+    外置 leader 标注不是触发条件：它在富渲染分支内默认开启（labels:false 可关回 on-part 徽标），
+    也可对老式 schematic 用 board.labels:true 单独点亮（不改其余渲染）。 */
+ const hasShell=!!(bd.shape||bd.path);
+ const hasGlyph=placed.some(p=>p.shape||p.path);
+ const wantLabel=(bd.labels===true)||((hasShell||hasGlyph||section)&&bd.labels!==false);
+ const enrich=hasShell||hasGlyph||section||(bd.labels===true&&placed.length);
+ let board='';
+ if(placed.length && !enrich){
+  /* ── legacy 分支（与 V2.7.0 字节级一致）── */
+  const BW=Math.max(160,Number(bd.w)||320),BH=Math.max(110,Number(bd.h)||210);
+  const round=(bd.shape==='module')?18:9;
+  const cells=placed.map(p=>{
+   const w=Math.max(4,Number(p.w)||14),h=Math.max(4,Number(p.h)||12);
+   const x=Math.max(0,Math.min(100,Number(p.x))),y=Math.max(0,Math.min(100,Number(p.y)));
+   const px=(x/100)*BW,py=(y/100)*BH,pw=(w/100)*BW,ph=(h/100)*BH;
+   const cx=px+pw/2,cy=py+ph/2;
+   const nm=String(p.name||'').slice(0,8);
+   return `<g class="ab-part">`
+    +`<rect x="${px.toFixed(1)}" y="${py.toFixed(1)}" width="${pw.toFixed(1)}" height="${ph.toFixed(1)}" rx="3" fill="${gcol(p.grade)}" fill-opacity=".88"/>`
+    +`<text class="ab-pname" x="${cx.toFixed(1)}" y="${(cy+13).toFixed(1)}">${nm}</text>`
+    +`<circle class="ab-badge" cx="${cx.toFixed(1)}" cy="${(cy-3).toFixed(1)}" r="8.5"/>`
+    +`<text class="ab-bnum" x="${cx.toFixed(1)}" y="${(cy+0.5).toFixed(1)}">${p.n!=null?p.n:''}</text>`
+    +`</g>`;
+  }).join('');
+  board=`<svg class="anat-board" viewBox="-6 -6 ${BW+12} ${BH+12}" role="img">`
+   +`<rect class="ab-bg" x="0" y="0" width="${BW}" height="${BH}" rx="${round}"/>${cells}</svg>`;
+ }else if(placed.length){
+  /* ── V2.7.1 通用富渲染分支 ── */
+  const BW=Math.max(160,Number(bd.w)||320),BH=Math.max(110,Number(bd.h)||210);
+  /* 剖面视图：按 parts 顺序把每个 part 自动堆叠成上下层（覆盖其 x/h，保留 grade/n/name）*/
+  const ABS=!section && placed.some(p=>[p.x,p.y,p.w,p.h].some(v=>Number(v)>100)); /* 坐标制式自动识别：非剖面下任一坐标>100=绝对(板内 px)，否则百分比 0-100；剖面恒按比例堆叠。作者两种写法都对 */
+  const lay=placed.map((p,i)=>{
+   let x=ABS?Number(p.x):Math.max(0,Math.min(100,Number(p.x))),y=ABS?Number(p.y):Math.max(0,Math.min(100,Number(p.y)));
+   let w=Math.max(4,Number(p.w)||14),h=Math.max(4,Number(p.h)||12);
+   if(section){const n=placed.length,gap=2,lh=(100-gap*(n+1))/n;x=8;w=84;h=lh;y=gap+(lh+gap)*i;}
+   const px=ABS?x:(x/100)*BW,py=ABS?y:(y/100)*BH,pw=ABS?w:(w/100)*BW,ph=ABS?h:(h/100)*BH;
+   return {p,px,py,pw,ph,cx:px+pw/2,cy:py+ph/2};
+  });
+  /* 外壳：path 逃生舱 > shape 查库 > section 默认 stack > 缺省扁平 ab-bg */
+  let shell;
+  if(bd.path) shell=`<path class="ab-shell" d="${bd.path}"/>`;
+  else if(bd.shape&&BOARD_SHELL[bd.shape]) shell=BOARD_SHELL[bd.shape](BW,BH);
+  else if(section) shell=BOARD_SHELL.stack(BW,BH);
+  else shell=`<rect class="ab-bg" x="0" y="0" width="${_f1(BW)}" height="${_f1(BH)}" rx="9"/>`;
+  /* 部件图元：parts[].path 逃生舱 > parts[].shape 查库 > section 默认 stack-layer > rect 兜底 */
+  const glyphs=lay.map(L=>{const p=L.p,fill=gcol(p.grade);
+   let g;
+   if(p.path) g=`<path d="${p.path}" fill="${fill}" fill-opacity=".9"/>`;
+   else{const fn=PART_GLYPH[p.shape]||(section?PART_GLYPH['stack-layer']:PART_GLYPH.rect);g=fn(L.px,L.py,L.pw,L.ph,fill,p);}
+   const nm=String(p.name||'').slice(0,9);
+   return `<g class="ab-part">${g}<text class="ab-pname" x="${_f1(L.cx)}" y="${_f1(L.cy+3)}">${nm}</text></g>`;
+  }).join('');
+  /* 外置 leader-line 标注：徽标放左/右边距 + 0.5px 虚线牵到部件；空间窄/labels:false → 回退 on-part 徽标 */
+  const M=wantLabel?64:0;  /* 左右各留 64px 标签边距 */
+  const lefts=[],rights=[];
+  if(wantLabel){
+   /* 按部件中心在左半/右半分组，组内按 y 排序，纵向均分边距槽位 */
+   lay.forEach(L=>{(L.cx<BW/2?lefts:rights).push(L);});
+   lefts.sort((a,b)=>a.cy-b.cy);rights.sort((a,b)=>a.cy-b.cy);
+  }
+  const slot=(arr,side)=>arr.map((L,i)=>{
+   const n=arr.length,sy=(BH/(n+1))*(i+1);
+   const bx=side==='L'?-M+14:BW+M-14,tx=side==='L'?-M+30:BW+M-30;
+   const p=L.p;
+   return `<line class="ab-lead" x1="${_f1(L.cx)}" y1="${_f1(L.cy)}" x2="${_f1(bx+(side==='L'?9:-9))}" y2="${_f1(sy)}"/>`
+    +`<circle class="ab-badge" cx="${_f1(bx)}" cy="${_f1(sy)}" r="8.5"/>`
+    +`<text class="ab-bnum" x="${_f1(bx)}" y="${_f1(sy+0.5)}">${p.n!=null?p.n:''}</text>`;
+  }).join('');
+  let badges;
+  if(wantLabel){badges=slot(lefts,'L')+slot(rights,'R');}
+  else{ /* on-part 徽标回退 */
+   badges=lay.map(L=>`<circle class="ab-badge" cx="${_f1(L.cx)}" cy="${_f1(L.py+9)}" r="8.5"/><text class="ab-bnum" x="${_f1(L.cx)}" y="${_f1(L.py+12.5)}">${L.p.n!=null?L.p.n:''}</text>`).join('');
+  }
+  const vbX=-6-M,vbW=BW+12+M*2;
+  board=`<svg class="anat-board" viewBox="${_f1(vbX)} -6 ${_f1(vbW)} ${BH+12}" role="img">${shell}${glyphs}${badges}</svg>`;
+ }
+ /* ② 图例表（HTML）— 始终渲染（板缺坐标时这是唯一输出）*/
+ const rows=parts.map(p=>{
+  const co=stripsec(p.co), sec=p.sec?`<span class="sec">${p.sec}</span>`:'';
+  const gr=isFinite(Number(p.grade))?`<span class="gr">${stars(Number(p.grade))}</span>`:'';
+  const link=p.link?p.link:'<span class="lg-dash">—</span>';
+  return `<tr style="background:${gtint(p.grade)}">`
+   +`<td class="lg-n">${p.n!=null?p.n:''}</td>`
+   +`<td class="lg-nm">${p.name||''}${gr}</td>`
+   +`<td>${p.fn||'<span class="lg-dash">→需补</span>'}</td>`
+   +`<td>${link}</td>`
+   +`<td class="lg-co">${co||'<span class="lg-dash">—</span>'}${sec}</td></tr>`;
+ }).join('');
+ const tbl=`<table class="anat-leg"><thead><tr><th>#</th><th>部件</th><th>功能</th><th>连接</th><th>公司</th></tr></thead><tbody>${rows}</tbody></table>`;
+ const note=c.legendnote?`<div class="anat-note">▸ ${c.legendnote}</div>`:'';
+ const cc=Object.assign({readhint:'板上编号徽标（外侧 ↔ 0.5px 虚线引线牵到部件）与下表 # 一一对应；色深=越卡脖子（grade 5→1：oxblood→faint）'+(placed.length?'':' · ⚠ 部件缺坐标，已降级为纯图例表')},c);
+ return `<figure class="vizfig">${figHead(cc,'实体标注解剖图')}<div class="anat">${board}${tbl}${note}</div>${figFoot(cc)}</figure>`;
+}
+
+/* ===== 全文 markdown 渲染（零删减）===== */
+const md=window.markdownit({html:true,linkify:false,breaks:false});
+document.getElementById('content').innerHTML=md.render(document.getElementById('md').textContent);
+document.querySelectorAll('#content h1,#content h2,#content h3').forEach(h=>{h.id=h.textContent.replace(/[\s、：·（）()\[\]/.,#]/g,'')});
+/* 表格包横向滚动容器（防溢出/竖排）*/
+document.querySelectorAll('#content table').forEach(t=>{const w=document.createElement('div');w.className='tablewrap';t.parentNode.insertBefore(w,t);w.appendChild(t);});
+/* mermaid 复活 */
+document.querySelectorAll('#content code.language-mermaid').forEach(el=>{const d=document.createElement('div');d.className='mermaid';d.textContent=el.textContent;el.closest('pre').replaceWith(d);});
+if(typeof mermaid!=='undefined'){try{mermaid.initialize({startOnLoad:false,theme:'base',themeVariables:{fontFamily:'PingFang SC,sans-serif',fontSize:'13px'},flowchart:{nodeSpacing:28,rankSpacing:32,useMaxWidth:true}});mermaid.run({querySelector:'#content .mermaid'});}catch(e){}}
+/* ASCII <pre> → 渲染图。优先读紧邻前的 <!--VIZ:KEY--> 标记（稳健，V2.5.2+）；
+   无标记则回退关键词 sentinel（兼容老报告） */
+function vizKey(pre){let n=pre.previousSibling,hop=0;while(n&&hop<4){if(n.nodeType===8){const m=/VIZ:(\w+)/.exec(n.nodeValue);if(m)return m[1];}if(n.nodeType===1)break;n=n.previousSibling;hop++;}return null;}
+function kwKey(t){if(t.includes('产业链全景'))return'chain';if(t.includes('资金流总览')||t.includes('价值传导'))return'valueflow';if(t.includes('世界分布'))return'geo';if(t.includes('不可或缺'))return'bubble';if(t.includes('Embryonic')&&t.includes('卡脖子'))return'lifecycle';return null;}
+let _vid=0;
+document.querySelectorAll('#content pre').forEach(pre=>{try{
+ const key=vizKey(pre)||kwKey(pre.textContent);
+ if(!key) return;
+ const base=key.split('_')[0], xdata=CH[key];
+ if(key==='chain' && CH.chain){const w=document.createElement('div');w.innerHTML=buildChain(CH.chain);pre.replaceWith(w.firstChild);return;}
+ if(key==='valueflow' && CH.valueflow){const w=document.createElement('div');w.innerHTML=buildValueflow(CH.valueflow);pre.replaceWith(w.firstChild);return;}
+ if(key==='anatomy' && CH.anatomy){const w=document.createElement('div');w.innerHTML=renderAnatomy(CH.anatomy);pre.replaceWith(w.firstChild);return;}
+ if(key==='geo' && CH.geo){pre.id='geo_'+(++_vid);renderGeo(pre,CH.geo);return;}
+ if(key==='bubble' && CH.bubble){pre.id='bub_'+(++_vid);renderBubble(pre,CH.bubble);return;}
+ if(key==='lifecycle' && CH.lifecycle){pre.id='lc_'+(++_vid);renderLifecycle(pre,CH.lifecycle);return;}
+ if(base==='timeline' && xdata){pre.id='v_'+(++_vid);renderTimeline(pre,xdata);return;}
+ if(base==='scorecard' && xdata){pre.id='v_'+(++_vid);renderScorecard(pre,xdata);return;}
+ if(base==='gauge' && xdata){pre.id='v_'+(++_vid);renderGauge(pre,xdata);return;}
+ if(base==='network' && xdata){pre.id='v_'+(++_vid);renderNetwork(pre,xdata);return;}
+ if(base==='cycle' && xdata){pre.id='v_'+(++_vid);renderCycle(pre,xdata);return;}
+ if(base==='trend' && xdata){pre.id='v_'+(++_vid);renderTrend(pre,xdata);return;}
+ if(base==='benchbar' && xdata){pre.id='v_'+(++_vid);renderBenchbar(pre,xdata);return;}
+}catch(_e){console.warn('viz 渲染跳过（单图异常，不影响其它）:',_e);}});
+/* A线增强：标记后无 <pre> 时，图直接插在 <!--VIZ:KEY--> 标记处（正文表格保留作零删减详情）*/
+(function(){
+ const R={geo:renderGeo,bubble:renderBubble,lifecycle:renderLifecycle,timeline:renderTimeline,scorecard:renderScorecard,gauge:renderGauge,network:renderNetwork,cycle:renderCycle,trend:renderTrend,benchbar:renderBenchbar};
+ const cw=document.createTreeWalker(document.getElementById('content'),NodeFilter.SHOW_COMMENT);
+ const nodes=[];let n;while(n=cw.nextNode())nodes.push(n);
+ nodes.forEach(node=>{try{
+  const m=/VIZ:(\w+)/.exec(node.nodeValue);if(!m)return;
+  const key=m[1],base=key.split('_')[0],data=CH[key];if(!data)return;
+  const nx=node.nextElementSibling;
+  if(nx&&nx.classList&&nx.classList.contains('vizfig'))return; // pre-loop 已渲染，跳过
+  const ph=document.createElement('div');ph.id='vp_'+(++_vid);node.parentNode.insertBefore(ph,node.nextSibling);
+  if(base==='chain'){const w=document.createElement('div');w.innerHTML=buildChain(data);ph.replaceWith(w.firstChild);}
+  else if(base==='valueflow'){const w=document.createElement('div');w.innerHTML=buildValueflow(data);ph.replaceWith(w.firstChild);}
+  else if(base==='anatomy'){const w=document.createElement('div');w.innerHTML=renderAnatomy(data);ph.replaceWith(w.firstChild);}
+  else if(R[base]) R[base](ph,data);
+  else ph.remove();
+ }catch(_e){console.warn('viz2 渲染跳过:',_e);}});
+})();
+/* ticker → Yahoo Finance 超链接（点 ticker 跳转）*/
+try{(function(){
+ const keys=Object.keys(TK).sort((a,b)=>b.length-a.length);
+ if(!keys.length) return;
+ const esc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+ const re=new RegExp('(?<![A-Za-z0-9.$])('+keys.map(esc).join('|')+')(?![A-Za-z0-9])','g');
+ const SKIP={A:1,SCRIPT:1,STYLE:1,CODE:1,PRE:1};  /* 不在已有链接 / 代码块 / ASCII pre 内 linkify */
+ const walk=document.createTreeWalker(document.getElementById('content'),NodeFilter.SHOW_TEXT,{acceptNode:n=>{
+   if(SKIP[n.parentNode.nodeName]) return NodeFilter.FILTER_REJECT;
+   return re.test(n.nodeValue)?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_SKIP;
+ }});
+ const todo=[];let n;while(n=walk.nextNode())todo.push(n);
+ todo.forEach(node=>{
+  re.lastIndex=0;
+  const frag=document.createDocumentFragment();let last=0,m;
+  while(m=re.exec(node.nodeValue)){
+   if(m.index>last)frag.appendChild(document.createTextNode(node.nodeValue.slice(last,m.index)));
+   const a=document.createElement('a');a.className='tk-link';a.href=TK[m[1]];a.target='_blank';a.rel='noopener';a.textContent=m[1];
+   frag.appendChild(a);last=m.index+m[1].length;
+  }
+  if(last<node.nodeValue.length)frag.appendChild(document.createTextNode(node.nodeValue.slice(last)));
+  node.parentNode.replaceChild(frag,node);
+ });
+})();}catch(e){/* 老浏览器无 lookbehind 时静默跳过 ticker linkify，不影响其他渲染 */}
+window.addEventListener('resize',()=>document.querySelectorAll('.chart,.vchart').forEach(c=>{const i=echarts.getInstanceByDom(c);i&&i.resize();}));
+</script></body></html>
